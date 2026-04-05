@@ -213,15 +213,10 @@ if [ -d "$SPARKLE_SOURCE" ]; then
     step "Copied Sparkle.framework"
 fi
 
-# Copy yt-dlp binary
-YTDLP_SOURCE="tools/yt-dlp/yt-dlp"
-if [ -f "$YTDLP_SOURCE" ]; then
-    cp "$YTDLP_SOURCE" "${RESOURCES_DIR}/yt-dlp"
-    chmod +x "${RESOURCES_DIR}/yt-dlp"
-    step "Copied yt-dlp"
-else
-    warn "yt-dlp not found at ${YTDLP_SOURCE} — YouTube features will be disabled"
-fi
+# yt-dlp is NOT bundled in the app — it's downloaded on first use to
+# ~/Library/Application Support/MovingPaper/ to avoid codesigning conflicts
+# with its embedded Python runtime.
+step "yt-dlp will be downloaded on first use"
 
 # Generate Info.plist
 cat > "${CONTENTS}/Info.plist" <<PLIST
@@ -313,14 +308,6 @@ if [ -d "$SPARKLE_FW" ]; then
     codesign --force --options runtime --timestamp \
         --sign "$CODESIGN_IDENTITY" "$SPARKLE_FW" 2>&1
     step "Signed Sparkle.framework"
-fi
-
-# Sign yt-dlp binary (must be signed for notarization)
-YTDLP_BUNDLE="${APP_BUNDLE}/Contents/Resources/yt-dlp"
-if [ -f "$YTDLP_BUNDLE" ]; then
-    codesign --force --options runtime --timestamp \
-        --sign "$CODESIGN_IDENTITY" "$YTDLP_BUNDLE" 2>&1
-    step "Signed yt-dlp"
 fi
 
 # Sign main app bundle

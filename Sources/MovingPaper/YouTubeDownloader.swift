@@ -38,11 +38,17 @@ final class YouTubeDownloader: ObservableObject {
 
     // MARK: - yt-dlp Binary
 
-    /// Path to the bundled yt-dlp binary. Falls back to tools/ for dev builds.
+    /// yt-dlp binary location in Application Support (downloaded on first use).
+    private static var ytdlpInstallPath: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupport.appendingPathComponent("MovingPaper/yt-dlp")
+    }
+
+    /// Path to the yt-dlp binary. Checks Application Support first, then dev tools/.
     private static var ytdlpPath: String? {
-        // Release build: inside app bundle
-        if let bundled = Bundle.main.url(forResource: "yt-dlp", withExtension: nil) {
-            return bundled.path(percentEncoded: false)
+        let installed = ytdlpInstallPath.path(percentEncoded: false)
+        if FileManager.default.fileExists(atPath: installed) {
+            return installed
         }
         // Dev build: tools directory relative to working directory
         let devPath = "tools/yt-dlp/yt-dlp"
@@ -50,6 +56,30 @@ final class YouTubeDownloader: ObservableObject {
             return devPath
         }
         return nil
+    }
+
+    /// Download yt-dlp if not already installed. Returns path on success.
+    static func ensureYTDLP() async -> String? {
+        if let existing = ytdlpPath { return existing }
+
+        let installURL = ytdlpInstallPath
+        let dir = installURL.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+
+        // Download from GitHub releases
+        let downloadURL = URL(string: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos")!
+        do {
+            let (data, response) = try await URLSession.shared.data(from: downloadURL)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                return nil
+            }
+            try data.write(to: installURL)
+            // Make executable
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: installURL.path(percentEncoded: false))
+            return installURL.path(percentEncoded: false)
+        } catch {
+            return nil
+        }
     }
 
     // MARK: - Download
@@ -68,8 +98,13 @@ final class YouTubeDownloader: ObservableObject {
             return cached
         }
 
-        guard let ytdlp = Self.ytdlpPath else {
-            state = .failed("yt-dlp not found. Reinstall the app.")
+        let ytdlp: String
+        if let existing = Self.ytdlpPath {
+            ytdlp = existing
+        } else if let downloaded = await Self.ensureYTDLP() {
+            ytdlp = downloaded
+        } else {
+            state = .failed("Could not download yt-dlp. Check your internet connection.")
             return nil
         }
 

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <!-- version-badge -->v0.012<!-- /version-badge --> · macOS 15+ · Swift 6 · MIT
+  <!-- version-badge -->v0.013<!-- /version-badge --> · macOS 15+ · Swift 6 · MIT
 </p>
 
 ---
@@ -25,7 +25,7 @@ The name is literal: It's your wallpaper, but it moves. Moving (Wall) Paper. **M
 ## Download
 
 <!-- download-link -->
-[**Download Moving Paper v0.012**](https://github.com/8bittts/moving-paper/releases/download/v0.012/MovingPaper-0.012.dmg)
+[**Download Moving Paper v0.013**](https://github.com/8bittts/moving-paper/releases/download/v0.013/MovingPaper-0.013.dmg)
 <!-- /download-link -->
 
 Open the `.dmg`, drag **Moving Paper** to Applications, launch it. Look for the night sky icon in your menu bar -- that's it.
