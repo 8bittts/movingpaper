@@ -80,12 +80,56 @@ pub_date="$(date -u '+%a, %d %b %Y %H:%M:%S +0000')"
 
 # ── Release notes (from git history) ──────────────────────────────────────
 
+release_notes_html() {
+    local ver="$1"
+    local items="$2"
+    cat <<HTML
+<style>
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        padding: 16px 20px;
+        line-height: 1.6;
+        color: #1d1d1f;
+    }
+    h2 { font-size: 17px; font-weight: 600; margin: 0 0 14px 0; }
+    ul { padding-left: 20px; margin: 0; }
+    li { margin-bottom: 6px; font-size: 13px; }
+    .footer { margin-top: 16px; font-size: 11px; color: #86868b; }
+</style>
+<h2>What's New</h2>
+<ul>
+$(printf '%b' "$items")</ul>
+<p class="footer">Moving Paper ${ver} -- your desktop, alive.</p>
+HTML
+}
+
 generate_release_notes() {
     local ver="$1"
 
+    # Override: SPARKLE_NOTES_SINCE=v0.008 to diff from a specific tag
+    # Override: SPARKLE_NOTES="line1\nline2" to set notes directly
+    if [ -n "${SPARKLE_NOTES:-}" ]; then
+        local items=""
+        while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            local cap
+            cap=$(echo "$line" | awk '{$1=toupper(substr($1,1,1)) substr($1,2)} 1')
+            items="${items}    <li>${cap}</li>\n"
+        done <<< "$(printf '%b' "$SPARKLE_NOTES")"
+
+        cat <<NOTES
+$(release_notes_html "$ver" "$items")
+NOTES
+        return
+    fi
+
     # Find the previous release tag to diff against
     local prev_tag
-    prev_tag=$(git tag --sort=-v:refname | grep '^v' | head -2 | tail -1)
+    if [ -n "${SPARKLE_NOTES_SINCE:-}" ]; then
+        prev_tag="$SPARKLE_NOTES_SINCE"
+    else
+        prev_tag=$(git tag --sort=-v:refname | grep '^v' | head -2 | tail -1)
+    fi
 
     # Get user-facing commit messages since the last tag
     # Filter out internal/developer commits — only keep feat/fix/feature work
@@ -132,24 +176,7 @@ generate_release_notes() {
         items="${items}    <li>${clean}</li>\n"
     done <<< "$commits"
 
-    cat <<NOTES
-<style>
-    body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        padding: 16px 20px;
-        line-height: 1.6;
-        color: #1d1d1f;
-    }
-    h2 { font-size: 17px; font-weight: 600; margin: 0 0 14px 0; }
-    ul { padding-left: 20px; margin: 0; }
-    li { margin-bottom: 6px; font-size: 13px; }
-    .footer { margin-top: 16px; font-size: 11px; color: #86868b; }
-</style>
-<h2>What's New</h2>
-<ul>
-$(printf '%b' "$items")</ul>
-<p class="footer">Moving Paper ${ver} -- your desktop, alive.</p>
-NOTES
+    release_notes_html "$ver" "$items"
 }
 
 # ── Generate appcast XML ────────────────────────────────────────────────────
