@@ -78,6 +78,54 @@ step "EdDSA signature: ${ed_signature:0:40}..."
 
 pub_date="$(date -u '+%a, %d %b %Y %H:%M:%S +0000')"
 
+# ── Release notes ──────────────────────────────────────────────────────────
+
+generate_release_notes() {
+    local ver="$1"
+    local notes_file="release-notes/${ver}.html"
+
+    # Use version-specific notes if available, otherwise generate default
+    if [ -f "$notes_file" ]; then
+        cat "$notes_file"
+        return
+    fi
+
+    # Default styled release notes
+    cat <<NOTES
+<style>
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        padding: 16px 20px;
+        line-height: 1.5;
+        color: #1d1d1f;
+    }
+    h2 {
+        font-size: 17px;
+        font-weight: 600;
+        margin: 0 0 12px 0;
+    }
+    ul {
+        padding-left: 20px;
+        margin: 0;
+    }
+    li {
+        margin-bottom: 6px;
+        font-size: 13px;
+    }
+    .footer {
+        margin-top: 16px;
+        font-size: 11px;
+        color: #86868b;
+    }
+</style>
+<h2>What's New</h2>
+<ul>
+    <li>Bug fixes and performance improvements</li>
+</ul>
+<p class="footer">Moving Paper ${ver} — your desktop, alive.</p>
+NOTES
+}
+
 # ── Generate appcast XML ────────────────────────────────────────────────────
 
 cat > "$OUTPUT" <<APPCAST
@@ -96,12 +144,7 @@ cat > "$OUTPUT" <<APPCAST
             <sparkle:minimumSystemVersion>${MIN_MACOS}</sparkle:minimumSystemVersion>
             <pubDate>${pub_date}</pubDate>
             <description><![CDATA[
-                <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 14px; }
-                    h2 { margin: 0 0 10px 0; font-size: 16px; }
-                </style>
-                <h2>Moving Paper ${VERSION}</h2>
-                <p>Animated desktop wallpapers for macOS.</p>
+$(generate_release_notes "$VERSION")
             ]]></description>
             <enclosure
                 url="${DOWNLOAD_URL}"
