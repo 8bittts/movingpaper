@@ -504,6 +504,14 @@ CHECKSUM=$(shasum -a 256 "$DMG_FINAL" | awk '{print $1}')
 echo "$CHECKSUM  $(basename "$DMG_FINAL")" > "${DIST_DIR}/${APP_NAME}-${VERSION}.sha256"
 step "SHA-256: ${CHECKSUM}"
 
+# ── Step 8b: Create local git tag ────────────────────────────────────────────
+
+# Tag locally so appcast release notes can diff between versions
+if ! git tag -l "v${VERSION}" | grep -q "v${VERSION}"; then
+    git tag "v${VERSION}" 2>/dev/null || true
+    step "Tagged v${VERSION}"
+fi
+
 # ── Step 9: Update README download link ─────────────────────────────────────
 
 info "Updating README.md download link"

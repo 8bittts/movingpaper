@@ -87,26 +87,48 @@ generate_release_notes() {
     local prev_tag
     prev_tag=$(git tag --sort=-v:refname | grep '^v' | head -2 | tail -1)
 
-    # Get commit messages since the last tag, clean them up for display
+    # Get user-facing commit messages since the last tag
+    # Filter out internal/developer commits — only keep feat/fix/feature work
     local commits=""
     if [ -n "$prev_tag" ]; then
         commits=$(git log "${prev_tag}..HEAD" --pretty=format:"%s" --no-merges 2>/dev/null \
             | grep -v "^release:" \
-            | head -8)
+            | grep -v "^chore:" \
+            | grep -v "^ci:" \
+            | grep -v "^docs:" \
+            | grep -v "^style:" \
+            | grep -v "^refactor:" \
+            | grep -v "^test:" \
+            | grep -v "^build:" \
+            | grep -vi "^Update " \
+            | grep -vi "remove tracked" \
+            | grep -vi "gitignore" \
+            | grep -vi "README" \
+            | grep -vi "CLAUDE" \
+            | grep -vi "AGENTS" \
+            | grep -vi "appcast" \
+            | grep -vi "sparkle" \
+            | grep -vi "notariz" \
+            | grep -vi "build script" \
+            | grep -vi "build-dmg" \
+            | grep -vi "codesign" \
+            | head -6)
     fi
 
-    # If no commits found, use a generic message
+    # If no user-facing commits, use a friendly default
     if [ -z "$commits" ]; then
-        commits="Bug fixes and improvements"
+        commits="Bug fixes and performance improvements"
     fi
 
-    # Build HTML list items from commit messages
+    # Build HTML list items — strip prefixes and capitalize first letter
     local items=""
     while IFS= read -r msg; do
         [ -z "$msg" ] && continue
-        # Clean up prefixes (feat:, fix:, etc.)
+        # Strip conventional commit prefixes (feat:, fix:, etc.)
         local clean
         clean=$(echo "$msg" | sed 's/^[a-z]*: *//')
+        # Capitalize first letter using awk (portable across macOS/Linux)
+        clean=$(echo "$clean" | awk '{$1=toupper(substr($1,1,1)) substr($1,2)} 1')
         items="${items}    <li>${clean}</li>\n"
     done <<< "$commits"
 
