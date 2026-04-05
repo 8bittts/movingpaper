@@ -16,9 +16,9 @@
 
 ## The Story
 
-I just wanted a simple way to animate my wallpaper while I code. No bloated app, no subscription, no electron wrapper -- just a native macOS menu bar utility that plays a video or GIF behind my desktop icons. That's it. That's the whole project.
+I just wanted a simple way to animate my wallpaper while I code. No bloated app, no subscription, no electron wrapper; just a fully native macOS menu bar utility that plays a video or GIF behind my desktop windows. That's it. That's the whole project. Magic.
 
-The name is literal: it's your wallpaper, but it moves. Moving (Wall) Paper. **Moving Paper**.
+The name is literal: It's your wallpaper, but it moves. Moving (Wall) Paper. **Moving Paper**.
 
 ---
 
