@@ -31,12 +31,23 @@ enum MenuBarIcon {
     }
 
     private static func resized(_ source: NSImage) -> NSImage {
-        let image = NSImage(size: menuBarSize, flipped: false) { rect in
-            NSGraphicsContext.current?.imageInterpolation = .high
-            NSGraphicsContext.current?.shouldAntialias = true
-            let path = NSBezierPath(roundedRect: rect, xRadius: 7, yRadius: 7)
-            path.addClip()
-            source.draw(in: rect)
+        let size = menuBarSize
+        let image = NSImage(size: size, flipped: false) { rect in
+            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+            ctx.setAllowsAntialiasing(true)
+            ctx.setShouldAntialias(true)
+            ctx.interpolationQuality = .high
+
+            // Smooth continuous-curvature path (squircle) at 30% radius
+            let radius = min(rect.width, rect.height) * 0.30
+            let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+            ctx.addPath(path)
+            ctx.clip()
+
+            // Draw the source image
+            if let cgImage = source.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                ctx.draw(cgImage, in: rect)
+            }
             return true
         }
         image.isTemplate = false
