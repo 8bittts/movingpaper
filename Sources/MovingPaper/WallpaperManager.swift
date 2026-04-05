@@ -57,6 +57,9 @@ final class WallpaperManager: ObservableObject {
     /// Whether video audio is muted.
     @Published var isMuted: Bool = true
 
+    /// YouTube downloader for pasting YouTube URLs as wallpapers.
+    let youtubeDownloader = YouTubeDownloader()
+
     // MARK: - Private State
 
     private var controllers: [CGDirectDisplayID: WallpaperWindowController] = [:]
@@ -65,6 +68,9 @@ final class WallpaperManager: ObservableObject {
     private var powerObservers: [Any] = []
     private var systemPaused: Bool = false
     @Published private(set) var activeSpaceID: UInt64 = 0
+
+    /// Original YouTube URLs for desktops using YouTube content (for re-download if cache cleared).
+    private var youtubeURLs: [DesktopKey: String] = [:]
 
     // MARK: - Persistence Keys
 
@@ -184,13 +190,60 @@ final class WallpaperManager: ObservableObject {
         rebuildAllWindows()
     }
 
+    /// Download a YouTube video and set it as wallpaper.
+    func setYouTubeWallpaper(urlString: String, for displayID: CGDirectDisplayID? = nil) {
+        guard YouTubeURLParser.isYouTubeURL(urlString) else {
+            showAlert(title: "Invalid URL", message: "That doesn't look like a YouTube URL.")
+            return
+        }
+
+        Task {
+            guard let localURL = await youtubeDownloader.download(youtubeURL: urlString) else {
+                if case .failed(let msg) = youtubeDownloader.state {
+                    showAlert(title: "Download Failed", message: msg)
+                }
+                return
+            }
+
+            // Store the YouTube URL for persistence
+            switch mode {
+            case .allDesktops:
+                youtubeURLs.removeAll()
+                for screen in NSScreen.screens {
+                    if let id = screen.displayID {
+                        youtubeURLs[DesktopKey(displayID: id)] = urlString
+                    }
+                }
+            case .perDesktop:
+                if let id = displayID {
+                    youtubeURLs[DesktopKey(displayID: id, spaceID: activeSpaceID)] = urlString
+                }
+            }
+
+            setWallpaper(url: localURL, for: displayID)
+        }
+    }
+
+    private func showAlert(title: String, message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+
     /// Remove wallpaper from a specific display (current space in perDesktop mode).
     func clearWallpaper(for displayID: CGDirectDisplayID) {
         switch mode {
         case .allDesktops:
-            desktopFiles.removeValue(forKey: DesktopKey(displayID: displayID))
+            let key = DesktopKey(displayID: displayID)
+            desktopFiles.removeValue(forKey: key)
+            youtubeURLs.removeValue(forKey: key)
         case .perDesktop:
-            desktopFiles.removeValue(forKey: DesktopKey(displayID: displayID, spaceID: activeSpaceID))
+            let key = DesktopKey(displayID: displayID, spaceID: activeSpaceID)
+            desktopFiles.removeValue(forKey: key)
+            youtubeURLs.removeValue(forKey: key)
         }
         if let controller = controllers.removeValue(forKey: displayID) {
             controller.close()
@@ -201,6 +254,7 @@ final class WallpaperManager: ObservableObject {
     /// Remove all wallpapers.
     func clearAllWallpapers() {
         desktopFiles.removeAll()
+        youtubeURLs.removeAll()
         tearDownWindows()
         saveState()
     }
@@ -210,19 +264,25 @@ final class WallpaperManager: ObservableObject {
         guard newMode != mode else { return }
 
         if newMode == .allDesktops, let firstURL = desktopFiles.values.first {
+            let firstYT = youtubeURLs.values.first
             desktopFiles.removeAll()
+            youtubeURLs.removeAll()
             for screen in NSScreen.screens {
                 if let id = screen.displayID {
-                    desktopFiles[DesktopKey(displayID: id)] = firstURL
+                    let key = DesktopKey(displayID: id)
+                    desktopFiles[key] = firstURL
+                    if let yt = firstYT { youtubeURLs[key] = yt }
                 }
             }
         } else if newMode == .perDesktop {
-            // Migrate allDesktops entries to current space
             let oldFiles = desktopFiles
+            let oldYT = youtubeURLs
             desktopFiles.removeAll()
+            youtubeURLs.removeAll()
             for (key, url) in oldFiles {
                 let newKey = DesktopKey(displayID: key.displayID, spaceID: activeSpaceID)
                 desktopFiles[newKey] = url
+                if let yt = oldYT[key] { youtubeURLs[newKey] = yt }
             }
         }
 
@@ -250,11 +310,15 @@ final class WallpaperManager: ObservableObject {
 
     private func saveState() {
         let encoded: [[String: Any]] = desktopFiles.map { (key, url) in
-            [
+            var entry: [String: Any] = [
                 "displayID": NSNumber(value: key.displayID),
                 "spaceID": NSNumber(value: key.spaceID),
                 "path": url.path(percentEncoded: false),
             ]
+            if let ytURL = youtubeURLs[key] {
+                entry["youtubeURL"] = ytURL
+            }
+            return entry
         }
         UserDefaults.standard.set(encoded, forKey: Defaults.desktopFiles)
         UserDefaults.standard.set(mode.rawValue, forKey: Defaults.mode)
@@ -271,20 +335,42 @@ final class WallpaperManager: ObservableObject {
         guard let entries = UserDefaults.standard.array(forKey: Defaults.desktopFiles)
                 as? [[String: Any]] else { return }
 
+        var needsRedownload: [(DesktopKey, String)] = []
+
         for entry in entries {
             guard let displayIDNum = entry["displayID"] as? NSNumber,
                   let spaceIDNum = entry["spaceID"] as? NSNumber,
                   let path = entry["path"] as? String else { continue }
-            guard FileManager.default.fileExists(atPath: path) else { continue }
             let key = DesktopKey(
                 displayID: displayIDNum.uint32Value,
                 spaceID: spaceIDNum.uint64Value
             )
-            desktopFiles[key] = URL(filePath: path)
+
+            // Restore YouTube URL mapping
+            if let ytURL = entry["youtubeURL"] as? String {
+                youtubeURLs[key] = ytURL
+            }
+
+            if FileManager.default.fileExists(atPath: path) {
+                desktopFiles[key] = URL(filePath: path)
+            } else if let ytURL = entry["youtubeURL"] as? String {
+                // File missing but we have the YouTube URL — queue re-download
+                needsRedownload.append((key, ytURL))
+            }
         }
 
         if !desktopFiles.isEmpty {
             rebuildAllWindows()
+        }
+
+        // Re-download missing YouTube videos in background
+        for (key, ytURL) in needsRedownload {
+            Task {
+                guard let localURL = await youtubeDownloader.download(youtubeURL: ytURL) else { return }
+                desktopFiles[key] = localURL
+                saveState()
+                rebuildAllWindows()
+            }
         }
     }
 

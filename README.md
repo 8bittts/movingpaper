@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <!-- version-badge -->v0.008<!-- /version-badge --> · macOS 15+ · Swift 6 · MIT
+  <!-- version-badge -->v0.009<!-- /version-badge --> · macOS 15+ · Swift 6 · MIT
 </p>
 
 ---
@@ -25,7 +25,7 @@ The name is literal: It's your wallpaper, but it moves. Moving (Wall) Paper. **M
 ## Download
 
 <!-- download-link -->
-[**Download Moving Paper v0.008**](https://github.com/8bittts/moving-paper/releases/download/v0.008/MovingPaper-0.008.dmg)
+[**Download Moving Paper v0.009**](https://github.com/8bittts/moving-paper/releases/download/v0.009/MovingPaper-0.009.dmg)
 <!-- /download-link -->
 
 Open the `.dmg`, drag **Moving Paper** to Applications, launch it. Look for the night sky icon in your menu bar -- that's it.
@@ -42,14 +42,17 @@ Plays a looping video or GIF as your desktop background. Icons, right-click menu
 |--------|-----------|-------|
 | Video  | `.mp4`, `.mov`, `.m4v` | Seamless looping, HEVC with alpha |
 | GIF    | `.gif` | Native frame timing |
+| YouTube | URL paste | Downloads via yt-dlp, plays as local MP4 |
 
 ## Features
 
+- **YouTube wallpapers** -- paste a YouTube URL, video downloads and loops as your wallpaper
 - **Per-desktop wallpapers** -- different wallpaper on each macOS Space and monitor, like native macOS
 - **Sound control** -- mute or unmute video audio (muted by default)
 - **Multi-monitor** -- auto-detects displays, rebuilds on hot-plug
 - **Power-aware** -- pauses on Low Power Mode and thermal throttling
 - **Auto-updates** -- checks hourly via Sparkle, EdDSA-verified
+- **Persistent settings** -- wallpapers restore on app relaunch
 - **Menu bar only** -- no Dock icon, no clutter
 
 ## Menu
@@ -57,11 +60,13 @@ Plays a looping video or GIF as your desktop background. Icons, right-click menu
 | Item | |
 |------|---|
 | **Choose File...** | Pick a `.gif`, `.mp4`, `.mov`, or `.m4v` |
+| **Paste YouTube URL...** | Download a YouTube video as wallpaper |
 | **Sound: Off / On** | Toggle video audio |
 | **Wallpaper Mode** | All Desktops or Per Desktop |
 | **Pause / Resume** | Stop or restart playback |
 | **Remove Wallpaper** | Clear wallpaper |
 | **Check for Updates...** | Sparkle update check |
+| **Built with YEN** | Visit yen.chat |
 | **Quit Moving Paper** | Exit |
 
 In **Per Desktop** mode, each Space and monitor gets its own wallpaper -- switch Spaces and the wallpaper changes with it.

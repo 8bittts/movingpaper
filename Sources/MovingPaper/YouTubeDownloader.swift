@@ -1,0 +1,165 @@
+import AppKit
+import Combine
+import Foundation
+
+/// Downloads YouTube videos to local cache using bundled yt-dlp binary.
+@MainActor
+final class YouTubeDownloader: ObservableObject {
+
+    enum State: Equatable {
+        case idle
+        case downloading(progress: Double)
+        case failed(String)
+    }
+
+    @Published private(set) var state: State = .idle
+
+    private var process: Process?
+
+    // MARK: - Cache Directory
+
+    static var cacheDirectory: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupport.appendingPathComponent("MovingPaper/YouTube", isDirectory: true)
+    }
+
+    /// Returns the cached file URL if the video has already been downloaded.
+    static func cachedFile(for videoID: String) -> URL? {
+        let path = cacheDirectory.appendingPathComponent("\(videoID).mp4")
+        return FileManager.default.fileExists(atPath: path.path(percentEncoded: false)) ? path : nil
+    }
+
+    // MARK: - yt-dlp Binary
+
+    /// Path to the bundled yt-dlp binary. Falls back to tools/ for dev builds.
+    private static var ytdlpPath: String? {
+        // Release build: inside app bundle
+        if let bundled = Bundle.main.url(forResource: "yt-dlp", withExtension: nil) {
+            return bundled.path(percentEncoded: false)
+        }
+        // Dev build: tools directory relative to working directory
+        let devPath = "tools/yt-dlp/yt-dlp"
+        if FileManager.default.fileExists(atPath: devPath) {
+            return devPath
+        }
+        return nil
+    }
+
+    // MARK: - Download
+
+    /// Download a YouTube video and return the local file URL.
+    /// Returns nil on failure (state will be .failed with a message).
+    func download(youtubeURL: String) async -> URL? {
+        guard let videoID = YouTubeURLParser.videoID(from: youtubeURL) else {
+            state = .failed("Invalid YouTube URL")
+            return nil
+        }
+
+        // Check cache first
+        if let cached = Self.cachedFile(for: videoID) {
+            state = .idle
+            return cached
+        }
+
+        guard let ytdlp = Self.ytdlpPath else {
+            state = .failed("yt-dlp not found. Reinstall the app.")
+            return nil
+        }
+
+        // Ensure cache directory exists
+        let cacheDir = Self.cacheDirectory
+        try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+
+        let outputPath = cacheDir.appendingPathComponent("\(videoID).mp4").path(percentEncoded: false)
+        let partialPath = cacheDir.appendingPathComponent("\(videoID).part").path(percentEncoded: false)
+
+        state = .downloading(progress: 0)
+
+        let result = await runYTDLP(
+            binary: ytdlp,
+            arguments: [
+                "-f", "best[ext=mp4][height<=1080]/best[ext=mp4]/best",
+                "--no-playlist",
+                "--newline",
+                "--progress",
+                "-o", outputPath,
+                youtubeURL,
+            ]
+        )
+
+        // Clean up partial file on failure
+        if !result {
+            try? FileManager.default.removeItem(atPath: outputPath)
+            try? FileManager.default.removeItem(atPath: partialPath)
+            if case .downloading = state {
+                state = .failed("Download failed")
+            }
+            return nil
+        }
+
+        guard FileManager.default.fileExists(atPath: outputPath) else {
+            state = .failed("Download completed but file not found")
+            return nil
+        }
+
+        state = .idle
+        return URL(filePath: outputPath)
+    }
+
+    /// Cancel an in-progress download.
+    func cancel() {
+        process?.terminate()
+        process = nil
+        state = .idle
+    }
+
+    // MARK: - Process Runner
+
+    private func runYTDLP(binary: String, arguments: [String]) async -> Bool {
+        await withCheckedContinuation { continuation in
+            let proc = Process()
+            proc.executableURL = URL(filePath: binary)
+            proc.arguments = arguments
+
+            let pipe = Pipe()
+            proc.standardOutput = pipe
+            proc.standardError = pipe
+
+            self.process = proc
+
+            // Read output on background thread, dispatch progress to MainActor
+            pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+                let data = handle.availableData
+                guard !data.isEmpty, let line = String(data: data, encoding: .utf8) else { return }
+
+                // Parse yt-dlp progress lines like "[download]  45.2% of ~12.34MiB"
+                if let range = line.range(of: #"\d+\.\d+%"#, options: .regularExpression) {
+                    let percentStr = line[range].dropLast() // remove %
+                    if let percent = Double(percentStr) {
+                        Task { @MainActor [weak self] in
+                            self?.state = .downloading(progress: percent / 100.0)
+                        }
+                    }
+                }
+            }
+
+            proc.terminationHandler = { _ in
+                pipe.fileHandleForReading.readabilityHandler = nil
+                Task { @MainActor [weak self] in
+                    self?.process = nil
+                }
+                continuation.resume(returning: proc.terminationStatus == 0)
+            }
+
+            do {
+                try proc.run()
+            } catch {
+                Task { @MainActor [weak self] in
+                    self?.state = .failed("Failed to run yt-dlp: \(error.localizedDescription)")
+                    self?.process = nil
+                }
+                continuation.resume(returning: false)
+            }
+        }
+    }
+}

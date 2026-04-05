@@ -31,6 +31,7 @@ final class StatusBarController {
             wallpaperManager.$isMuted.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             wallpaperManager.$mode.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             wallpaperManager.$activeSpaceID.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            wallpaperManager.youtubeDownloader.$state.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             updater.$canCheckForUpdates.dropFirst().map { _ in () }.eraseToAnyPublisher()
         )
         .debounce(for: .milliseconds(50), scheduler: RunLoop.main)
@@ -40,6 +41,23 @@ final class StatusBarController {
 
     private func rebuildMenu() {
         let menu = NSMenu()
+
+        // Show download progress if active
+        if case .downloading(let progress) = wallpaperManager.youtubeDownloader.state {
+            let pct = Int(progress * 100)
+            let progressItem = NSMenuItem(title: "Downloading: \(pct)%...", action: nil, keyEquivalent: "")
+            progressItem.isEnabled = false
+            menu.addItem(progressItem)
+
+            let cancelItem = NSMenuItem(
+                title: "Cancel Download",
+                action: #selector(cancelDownload),
+                keyEquivalent: ""
+            )
+            cancelItem.target = self
+            menu.addItem(cancelItem)
+            menu.addItem(.separator())
+        }
 
         switch wallpaperManager.mode {
         case .allDesktops:
@@ -165,6 +183,14 @@ final class StatusBarController {
         )
         chooseItem.target = self
         menu.addItem(chooseItem)
+
+        let youtubeItem = NSMenuItem(
+            title: "Paste YouTube URL...",
+            action: #selector(pasteYouTubeURLForAll),
+            keyEquivalent: "y"
+        )
+        youtubeItem.target = self
+        menu.addItem(youtubeItem)
     }
 
     // MARK: - Per Display Mode Menu
@@ -192,9 +218,7 @@ final class StatusBarController {
             let currentInList = spaces.contains { $0.isCurrent }
 
             for (index, space) in spaces.enumerated() {
-                let label = space.isCurrent
-                    ? "Desktop \(index + 1) — \(space.fileName)"
-                    : "Desktop \(index + 1) — \(space.fileName)"
+                let label = "Desktop \(index + 1) — \(space.fileName)"
                 let item = NSMenuItem(title: label, action: nil, keyEquivalent: "")
                 if space.isCurrent {
                     item.state = .on
@@ -211,6 +235,15 @@ final class StatusBarController {
                     chooseItem.target = self
                     chooseItem.tag = Int(display.id)
                     sub.addItem(chooseItem)
+
+                    let ytItem = NSMenuItem(
+                        title: "Paste YouTube URL...",
+                        action: #selector(pasteYouTubeURLForDisplay(_:)),
+                        keyEquivalent: ""
+                    )
+                    ytItem.target = self
+                    ytItem.tag = Int(display.id)
+                    sub.addItem(ytItem)
 
                     let removeItem = NSMenuItem(
                         title: "Remove",
@@ -244,6 +277,16 @@ final class StatusBarController {
                 chooseItem.target = self
                 chooseItem.tag = Int(display.id)
                 sub.addItem(chooseItem)
+
+                let ytItem = NSMenuItem(
+                    title: "Paste YouTube URL...",
+                    action: #selector(pasteYouTubeURLForDisplay(_:)),
+                    keyEquivalent: ""
+                )
+                ytItem.target = self
+                ytItem.tag = Int(display.id)
+                sub.addItem(ytItem)
+
                 item.submenu = sub
                 menu.addItem(item)
             }
@@ -299,6 +342,44 @@ final class StatusBarController {
 
     @objc private func setModePerDesktop() {
         wallpaperManager.setMode(.perDesktop)
+    }
+
+    @objc private func pasteYouTubeURLForAll() {
+        let urlString = promptForYouTubeURL()
+        guard let urlString else { return }
+        wallpaperManager.setYouTubeWallpaper(urlString: urlString)
+    }
+
+    @objc private func pasteYouTubeURLForDisplay(_ sender: NSMenuItem) {
+        let urlString = promptForYouTubeURL()
+        guard let urlString else { return }
+        let displayID = CGDirectDisplayID(sender.tag)
+        wallpaperManager.setYouTubeWallpaper(urlString: urlString, for: displayID)
+    }
+
+    @objc private func cancelDownload() {
+        wallpaperManager.youtubeDownloader.cancel()
+    }
+
+    private func promptForYouTubeURL() -> String? {
+        let alert = NSAlert()
+        alert.messageText = "Paste YouTube URL"
+        alert.informativeText = "Enter a YouTube video URL to use as your wallpaper."
+        alert.addButton(withTitle: "Download")
+        alert.addButton(withTitle: "Cancel")
+
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        input.placeholderString = "https://youtube.com/watch?v=..."
+        // Pre-fill from clipboard
+        if let clip = NSPasteboard.general.string(forType: .string) {
+            input.stringValue = clip
+        }
+        alert.accessoryView = input
+        alert.window.initialFirstResponder = input
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        let value = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
     }
 
     @objc private func checkForUpdates() {

@@ -137,6 +137,20 @@ info "Cleaning previous artifacts"
 /bin/rm -rf "$DIST_DIR" "$BUILD_DIR"
 mkdir -p "$DIST_DIR" "$BUILD_DIR"
 
+# ── Step 1b: Fetch yt-dlp if missing ─────────────────────────────────────────
+
+YTDLP_DIR="tools/yt-dlp"
+YTDLP_BIN="${YTDLP_DIR}/yt-dlp"
+if [ ! -f "$YTDLP_BIN" ]; then
+    info "Downloading yt-dlp"
+    mkdir -p "$YTDLP_DIR"
+    curl -sL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos" -o "$YTDLP_BIN"
+    chmod +x "$YTDLP_BIN"
+    step "Downloaded yt-dlp $(${YTDLP_BIN} --version)"
+else
+    step "yt-dlp present ($(${YTDLP_BIN} --version))"
+fi
+
 # ── Step 2: Generate app icon ────────────────────────────────────────────────
 
 info "Generating app icon"
@@ -197,6 +211,16 @@ SPARKLE_SOURCE="tools/sparkle/Sparkle.framework"
 if [ -d "$SPARKLE_SOURCE" ]; then
     ditto "$SPARKLE_SOURCE" "$FRAMEWORKS_DIR/Sparkle.framework"
     step "Copied Sparkle.framework"
+fi
+
+# Copy yt-dlp binary
+YTDLP_SOURCE="tools/yt-dlp/yt-dlp"
+if [ -f "$YTDLP_SOURCE" ]; then
+    cp "$YTDLP_SOURCE" "${RESOURCES_DIR}/yt-dlp"
+    chmod +x "${RESOURCES_DIR}/yt-dlp"
+    step "Copied yt-dlp"
+else
+    warn "yt-dlp not found at ${YTDLP_SOURCE} — YouTube features will be disabled"
 fi
 
 # Generate Info.plist
@@ -289,6 +313,14 @@ if [ -d "$SPARKLE_FW" ]; then
     codesign --force --options runtime --timestamp \
         --sign "$CODESIGN_IDENTITY" "$SPARKLE_FW" 2>&1
     step "Signed Sparkle.framework"
+fi
+
+# Sign yt-dlp binary (must be signed for notarization)
+YTDLP_BUNDLE="${APP_BUNDLE}/Contents/Resources/yt-dlp"
+if [ -f "$YTDLP_BUNDLE" ]; then
+    codesign --force --options runtime --timestamp \
+        --sign "$CODESIGN_IDENTITY" "$YTDLP_BUNDLE" 2>&1
+    step "Signed yt-dlp"
 fi
 
 # Sign main app bundle

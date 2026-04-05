@@ -11,3 +11,4 @@ DerivedData/
 CLAUDE.md
 AGENTS.md
 .claude/commands/
+tools/yt-dlp/yt-dlp
