@@ -2,6 +2,13 @@ import AppKit
 import Combine
 import Foundation
 
+private extension Array where Element: Hashable {
+    func uniqued() -> [Element] {
+        var seen = Set<Element>()
+        return filter { seen.insert($0).inserted }
+    }
+}
+
 /// Downloads YouTube videos to local cache using bundled yt-dlp binary.
 @MainActor
 final class YouTubeDownloader: ObservableObject {
@@ -78,7 +85,8 @@ final class YouTubeDownloader: ObservableObject {
         let result = await runYTDLP(
             binary: ytdlp,
             arguments: [
-                "-f", "best[ext=mp4][height<=1080]/best[ext=mp4]/best",
+                "-f", "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4][height<=1080]/best[ext=mp4]/best",
+                "--merge-output-format", "mp4",
                 "--no-playlist",
                 "--newline",
                 "--progress",
@@ -115,15 +123,29 @@ final class YouTubeDownloader: ObservableObject {
 
     // MARK: - Process Runner
 
+    /// Build PATH that includes common ffmpeg locations.
+    private static var processEnvironment: [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        let extraPaths = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
+        let currentPath = env["PATH"] ?? "/usr/bin:/bin"
+        let combined = (extraPaths + currentPath.split(separator: ":").map(String.init))
+            .uniqued()
+            .joined(separator: ":")
+        env["PATH"] = combined
+        return env
+    }
+
     private func runYTDLP(binary: String, arguments: [String]) async -> Bool {
         await withCheckedContinuation { continuation in
             let proc = Process()
             proc.executableURL = URL(filePath: binary)
             proc.arguments = arguments
+            proc.environment = Self.processEnvironment
 
             let pipe = Pipe()
+            let errPipe = Pipe()
             proc.standardOutput = pipe
-            proc.standardError = pipe
+            proc.standardError = errPipe
 
             self.process = proc
 
@@ -143,12 +165,25 @@ final class YouTubeDownloader: ObservableObject {
                 }
             }
 
-            proc.terminationHandler = { _ in
+            proc.terminationHandler = { proc in
                 pipe.fileHandleForReading.readabilityHandler = nil
-                Task { @MainActor [weak self] in
-                    self?.process = nil
+                let success = proc.terminationStatus == 0
+                if !success {
+                    let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+                    let errMsg = String(data: errData, encoding: .utf8) ?? ""
+                    Task { @MainActor [weak self] in
+                        let userMsg = errMsg.contains("ERROR:")
+                            ? errMsg.components(separatedBy: "ERROR:").last?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Download failed"
+                            : "Download failed"
+                        self?.state = .failed(userMsg)
+                        self?.process = nil
+                    }
+                } else {
+                    Task { @MainActor [weak self] in
+                        self?.process = nil
+                    }
                 }
-                continuation.resume(returning: proc.terminationStatus == 0)
+                continuation.resume(returning: success)
             }
 
             do {

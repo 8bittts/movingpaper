@@ -365,11 +365,14 @@ final class StatusBarController {
         let alert = NSAlert()
         alert.messageText = "Paste YouTube URL"
         alert.informativeText = "Enter a YouTube video URL to use as your wallpaper."
-        alert.addButton(withTitle: "Download")
+        alert.addButton(withTitle: "Start")
         alert.addButton(withTitle: "Cancel")
 
-        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 380, height: 24))
         input.placeholderString = "https://youtube.com/watch?v=..."
+        input.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        input.lineBreakMode = .byTruncatingMiddle
+        input.usesSingleLineMode = true
         // Pre-fill from clipboard
         if let clip = NSPasteboard.general.string(forType: .string) {
             input.stringValue = clip
