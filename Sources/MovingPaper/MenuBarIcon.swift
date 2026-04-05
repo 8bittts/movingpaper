@@ -1,55 +1,62 @@
 import AppKit
 
 /// Menu bar icon loader for Moving Paper.
-/// Uses the brand pixel art image at menu bar size (26x26), same approach as Kindred.
 @MainActor
 enum MenuBarIcon {
-    static let menuBarSize = NSSize(width: 26, height: 26)
 
-    /// Load brand icon from the app resource bundle, scaled to menu bar size.
-    /// Falls back to a system symbol if the brand image is missing.
     static func brandIcon() -> NSImage {
-        // Try loading from the SPM resource bundle
-        if let url = Bundle.module.url(forResource: "moving-paper", withExtension: "png", subdirectory: "Resources"),
-           let source = NSImage(contentsOf: url) {
-            return resized(source)
+        let pointSize = NSSize(width: 22, height: 22)
+        let pixelScale = 2  // Retina
+        let px = pixelScale * Int(pointSize.width)
+
+        // Load source
+        let source: NSImage? = {
+            if let url = Bundle.module.url(forResource: "moving-paper", withExtension: "png", subdirectory: "Resources"),
+               let img = NSImage(contentsOf: url) { return img }
+            if let url = Bundle.main.url(forResource: "moving-paper", withExtension: "png"),
+               let img = NSImage(contentsOf: url) { return img }
+            return nil
+        }()
+
+        guard let source,
+              let cgSource = source.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            let fallback = NSImage(systemSymbolName: "cloud.moon.fill", accessibilityDescription: "Moving Paper") ?? NSImage()
+            fallback.size = pointSize
+            return fallback
         }
 
-        // Try loading from main bundle resources
-        if let url = Bundle.main.url(forResource: "moving-paper", withExtension: "png"),
-           let source = NSImage(contentsOf: url) {
-            return resized(source)
-        }
+        // Render at 2x pixel resolution for crisp Retina corners
+        let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: px, pixelsHigh: px,
+            bitsPerSample: 8, samplesPerPixel: 4,
+            hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0, bitsPerPixel: 0
+        )!
+        rep.size = pointSize
 
-        // Fallback
-        let fallback = NSImage(
-            systemSymbolName: "cloud.moon.fill",
-            accessibilityDescription: "Moving Paper"
-        ) ?? NSImage()
-        fallback.size = menuBarSize
-        return fallback
-    }
+        NSGraphicsContext.saveGraphicsState()
+        let ctx = NSGraphicsContext(bitmapImageRep: rep)!
+        NSGraphicsContext.current = ctx
+        let cg = ctx.cgContext
 
-    private static func resized(_ source: NSImage) -> NSImage {
-        let size = menuBarSize
-        let image = NSImage(size: size, flipped: false) { rect in
-            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
-            ctx.setAllowsAntialiasing(true)
-            ctx.setShouldAntialias(true)
-            ctx.interpolationQuality = .high
+        cg.setShouldAntialias(true)
+        cg.setAllowsAntialiasing(true)
+        cg.interpolationQuality = .high
 
-            // Smooth continuous-curvature path (squircle) at 30% radius
-            let radius = min(rect.width, rect.height) * 0.30
-            let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
-            ctx.addPath(path)
-            ctx.clip()
+        let rect = CGRect(x: 0, y: 0, width: px, height: px)
+        let radius = CGFloat(px) * 0.24
+        let path = CGMutablePath()
+        path.addRoundedRect(in: rect, cornerWidth: radius, cornerHeight: radius)
+        cg.addPath(path)
+        cg.clip()
+        cg.draw(cgSource, in: rect)
 
-            // Draw the source image
-            if let cgImage = source.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-                ctx.draw(cgImage, in: rect)
-            }
-            return true
-        }
+        NSGraphicsContext.restoreGraphicsState()
+
+        let image = NSImage(size: pointSize)
+        image.addRepresentation(rep)
         image.isTemplate = false
         return image
     }
