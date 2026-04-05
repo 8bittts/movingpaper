@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <!-- version-badge -->v0.007<!-- /version-badge --> · macOS 15+ · Swift 6 · MIT
+  <!-- version-badge -->v0.008<!-- /version-badge --> · macOS 15+ · Swift 6 · MIT
 </p>
 
 ---
@@ -25,7 +25,7 @@ The name is literal: it's your wallpaper, but it moves. Moving (Wall) Paper. **M
 ## Download
 
 <!-- download-link -->
-[**Download Moving Paper v0.007**](https://github.com/8bittts/moving-paper/releases/download/v0.007/MovingPaper-0.007.dmg)
+[**Download Moving Paper v0.008**](https://github.com/8bittts/moving-paper/releases/download/v0.008/MovingPaper-0.008.dmg)
 <!-- /download-link -->
 
 Open the `.dmg`, drag **Moving Paper** to Applications, launch it. Look for the night sky icon in your menu bar -- that's it.
@@ -114,3 +114,18 @@ Fork, branch, `swift test`, PR. One feature or fix per PR.
 ## License
 
 [MIT](LICENSE)
+
+---
+
+<p align="center">
+  <img src="brand/yen.png" alt="YEN Terminal" width="100%" />
+</p>
+
+<h3 align="center">Built with YEN</h3>
+
+<p align="center">
+  <a href="https://yen.chat">YEN</a> is a personal terminal experience that makes command-line work beautiful.<br/>
+  Fast, customizable, and designed for developers who live in the terminal.<br/>
+  <br/>
+  <a href="https://yen.chat"><img src="https://img.shields.io/badge/Download-YEN-ff5100?style=for-the-badge" alt="Download YEN" /></a>
+</p>

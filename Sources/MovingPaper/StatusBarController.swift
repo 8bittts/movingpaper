@@ -115,6 +115,15 @@ final class StatusBarController {
         updateItem.isEnabled = updater.canCheckForUpdates
         menu.addItem(updateItem)
 
+        // ── Built with YEN ──
+        let yenItem = NSMenuItem(
+            title: "Built with YEN",
+            action: #selector(openYEN),
+            keyEquivalent: ""
+        )
+        yenItem.target = self
+        menu.addItem(yenItem)
+
         menu.addItem(.separator())
 
         // ── Quit ──
@@ -294,6 +303,10 @@ final class StatusBarController {
 
     @objc private func checkForUpdates() {
         updater.checkForUpdates()
+    }
+
+    @objc private func openYEN() {
+        NSWorkspace.shared.open(URL(string: "https://yen.chat")!)
     }
 
     @objc private func quit() {
