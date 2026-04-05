@@ -64,7 +64,7 @@ final class WallpaperManager: ObservableObject {
     private var spaceObserver: Any?
     private var powerObservers: [Any] = []
     private var systemPaused: Bool = false
-    private var activeSpaceID: UInt64 = 0
+    @Published private(set) var activeSpaceID: UInt64 = 0
 
     // MARK: - Persistence Keys
 
@@ -120,6 +120,15 @@ final class WallpaperManager: ObservableObject {
             guard let id = screen.displayID else { return nil }
             return (id: id, name: screen.localizedName)
         }
+    }
+
+    /// All Spaces with wallpapers assigned for a given display, sorted by space ID.
+    /// Returns (spaceID, fileName, isCurrent) tuples.
+    func spaceAssignments(for displayID: CGDirectDisplayID) -> [(spaceID: UInt64, fileName: String, isCurrent: Bool)] {
+        desktopFiles
+            .filter { $0.key.displayID == displayID && $0.key.spaceID != 0 }
+            .map { (spaceID: $0.key.spaceID, fileName: $0.value.lastPathComponent, isCurrent: $0.key.spaceID == activeSpaceID) }
+            .sorted { $0.spaceID < $1.spaceID }
     }
 
     /// Whether any desktop has a wallpaper assigned.

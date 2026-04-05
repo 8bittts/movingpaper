@@ -30,6 +30,7 @@ final class StatusBarController {
             wallpaperManager.$isPaused.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             wallpaperManager.$isMuted.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             wallpaperManager.$mode.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            wallpaperManager.$activeSpaceID.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             updater.$canCheckForUpdates.dropFirst().map { _ in () }.eraseToAnyPublisher()
         )
         .debounce(for: .milliseconds(50), scheduler: RunLoop.main)
@@ -169,48 +170,76 @@ final class StatusBarController {
             return
         }
 
-        for (index, display) in displays.enumerated() {
-            // Desktop header (disabled label)
-            let label = displays.count > 1 ? "Desktop \(index + 1) — \(display.name)" : "Desktop 1"
-            let headerItem = NSMenuItem(title: label, action: nil, keyEquivalent: "")
-            headerItem.isEnabled = false
-            menu.addItem(headerItem)
-
-            if let fileName = wallpaperManager.fileName(for: display.id) {
-                // Show current wallpaper filename with indent
-                let fileItem = NSMenuItem(title: "  \(fileName)", action: nil, keyEquivalent: "")
-                fileItem.isEnabled = false
-                menu.addItem(fileItem)
-
-                let chooseItem = NSMenuItem(
-                    title: "  Choose File...",
-                    action: #selector(chooseFileForDisplay(_:)),
-                    keyEquivalent: ""
-                )
-                chooseItem.target = self
-                chooseItem.tag = Int(display.id)
-                menu.addItem(chooseItem)
-
-                let removeItem = NSMenuItem(
-                    title: "  Remove",
-                    action: #selector(clearDisplayWallpaper(_:)),
-                    keyEquivalent: ""
-                )
-                removeItem.target = self
-                removeItem.tag = Int(display.id)
-                menu.addItem(removeItem)
-            } else {
-                let chooseItem = NSMenuItem(
-                    title: "  Choose File...",
-                    action: #selector(chooseFileForDisplay(_:)),
-                    keyEquivalent: ""
-                )
-                chooseItem.target = self
-                chooseItem.tag = Int(display.id)
-                menu.addItem(chooseItem)
+        for (displayIndex, display) in displays.enumerated() {
+            // Show display name only if multiple monitors
+            if displays.count > 1 {
+                let displayHeader = NSMenuItem(title: display.name, action: nil, keyEquivalent: "")
+                displayHeader.isEnabled = false
+                menu.addItem(displayHeader)
             }
 
-            if index < displays.count - 1 {
+            // Build numbered list: all spaces with wallpapers, plus the current space
+            let spaces = wallpaperManager.spaceAssignments(for: display.id)
+            let currentInList = spaces.contains { $0.isCurrent }
+
+            for (index, space) in spaces.enumerated() {
+                let label = space.isCurrent
+                    ? "Desktop \(index + 1) — \(space.fileName)"
+                    : "Desktop \(index + 1) — \(space.fileName)"
+                let item = NSMenuItem(title: label, action: nil, keyEquivalent: "")
+                if space.isCurrent {
+                    item.state = .on
+                }
+
+                // Submenu with actions
+                let sub = NSMenu()
+                if space.isCurrent {
+                    let chooseItem = NSMenuItem(
+                        title: "Choose File...",
+                        action: #selector(chooseFileForDisplay(_:)),
+                        keyEquivalent: ""
+                    )
+                    chooseItem.target = self
+                    chooseItem.tag = Int(display.id)
+                    sub.addItem(chooseItem)
+
+                    let removeItem = NSMenuItem(
+                        title: "Remove",
+                        action: #selector(clearDisplayWallpaper(_:)),
+                        keyEquivalent: ""
+                    )
+                    removeItem.target = self
+                    removeItem.tag = Int(display.id)
+                    sub.addItem(removeItem)
+                } else {
+                    let info = NSMenuItem(title: "Switch to this desktop to change", action: nil, keyEquivalent: "")
+                    info.isEnabled = false
+                    sub.addItem(info)
+                }
+                item.submenu = sub
+                menu.addItem(item)
+            }
+
+            // If current space has no wallpaper, show it with actions
+            if !currentInList {
+                let desktopNum = spaces.count + 1
+                let item = NSMenuItem(title: "Desktop \(desktopNum) — No Wallpaper", action: nil, keyEquivalent: "")
+                item.state = .on
+
+                let sub = NSMenu()
+                let chooseItem = NSMenuItem(
+                    title: "Choose File...",
+                    action: #selector(chooseFileForDisplay(_:)),
+                    keyEquivalent: ""
+                )
+                chooseItem.target = self
+                chooseItem.tag = Int(display.id)
+                sub.addItem(chooseItem)
+                item.submenu = sub
+                menu.addItem(item)
+            }
+
+            if displayIndex < displays.count - 1 {
                 menu.addItem(.separator())
             }
         }
