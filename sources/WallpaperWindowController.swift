@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import SwiftUI
 
 /// Manages a single WallpaperPanel for one screen.
@@ -8,6 +9,8 @@ final class WallpaperWindowController {
     let panel: WallpaperPanel
     private(set) var screen: NSScreen
     private(set) var currentURL: URL?
+    /// Direct reference to the video player for position save/restore and mute.
+    var player: AVQueuePlayer?
     private var hostingView: NSHostingView<AnyView>?
 
     init(screen: NSScreen) {

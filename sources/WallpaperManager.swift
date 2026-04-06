@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Combine
 import SwiftUI
 
@@ -74,9 +75,12 @@ final class WallpaperManager: ObservableObject {
     private let loadingOverlay = LoadingOverlayController()
     private var downloadOverlayObserver: AnyCancellable?
     @Published private(set) var activeSpaceID: UInt64 = 0
+    /// All Space IDs we've seen on each display (macOS has no API to enumerate Spaces).
+    private var knownSpaces: [CGDirectDisplayID: Set<UInt64>] = [:]
 
-    /// Original YouTube URLs for desktops using YouTube content (for re-download if cache cleared).
     private var youtubeURLs: [DesktopKey: String] = [:]
+    /// Cached playback positions so videos resume where the user left off after space switches.
+    private var playbackPositions: [DesktopKey: CMTime] = [:]
 
     // MARK: - Persistence Keys
 
@@ -88,11 +92,19 @@ final class WallpaperManager: ObservableObject {
 
     init() {
         activeSpaceID = currentSpaceID()
+        trackCurrentSpace()
         restoreState()
         observeScreenChanges()
         observeSpaceChanges()
         observePowerState()
         observeDownloadState()
+    }
+
+    private func trackCurrentSpace() {
+        for screen in NSScreen.screens {
+            guard let id = screen.displayID else { continue }
+            knownSpaces[id, default: []].insert(activeSpaceID)
+        }
     }
 
     // MARK: - Computed Helpers
@@ -130,13 +142,15 @@ final class WallpaperManager: ObservableObject {
         }
     }
 
-    /// All Spaces with wallpapers assigned for a given display, sorted by space ID.
-    /// Returns (spaceID, fileName, isCurrent) tuples.
+    /// All known Spaces for a display, sorted by space ID.
+    /// Includes Spaces with and without wallpapers — we track every Space the user visits.
     func spaceAssignments(for displayID: CGDirectDisplayID) -> [(spaceID: UInt64, fileName: String, isCurrent: Bool)] {
-        desktopFiles
-            .filter { $0.key.displayID == displayID && $0.key.spaceID != 0 }
-            .map { (spaceID: $0.key.spaceID, fileName: $0.value.lastPathComponent, isCurrent: $0.key.spaceID == activeSpaceID) }
-            .sorted { $0.spaceID < $1.spaceID }
+        let spaces = knownSpaces[displayID] ?? []
+        return spaces.sorted().map { spaceID in
+            let key = DesktopKey(displayID: displayID, spaceID: spaceID)
+            let fileName = desktopFiles[key]?.lastPathComponent ?? "No MovingPaper"
+            return (spaceID: spaceID, fileName: fileName, isCurrent: spaceID == activeSpaceID)
+        }
     }
 
     /// Whether any desktop has a wallpaper assigned.
@@ -164,8 +178,9 @@ final class WallpaperManager: ObservableObject {
         setWallpaper(url: url, for: displayID)
     }
 
-    /// Assign a wallpaper file.
-    func setWallpaper(url: URL, for displayID: CGDirectDisplayID? = nil) {
+    /// Assign a wallpaper file. In perDesktop mode, `spaceID` pins to a specific
+    /// space (use when the result arrives async and the user may have switched spaces).
+    func setWallpaper(url: URL, for displayID: CGDirectDisplayID? = nil, spaceID: UInt64? = nil) {
         isPaused = false
 
         switch mode {
@@ -179,7 +194,8 @@ final class WallpaperManager: ObservableObject {
             }
         case .perDesktop:
             if let id = displayID {
-                let key = DesktopKey(displayID: id, spaceID: activeSpaceID)
+                let space = spaceID ?? activeSpaceID
+                let key = DesktopKey(displayID: id, spaceID: space)
                 desktopFiles[key] = url
                 youtubeURLs.removeValue(forKey: key)
             }
@@ -196,6 +212,7 @@ final class WallpaperManager: ObservableObject {
             return
         }
 
+        let originSpaceID = activeSpaceID
         Task {
             guard let localURL = await youtubeDownloader.download(youtubeURL: urlString) else {
                 if case .failed(let msg) = youtubeDownloader.state {
@@ -204,7 +221,6 @@ final class WallpaperManager: ObservableObject {
                 return
             }
 
-            // Store the YouTube URL for persistence
             switch mode {
             case .allDesktops:
                 youtubeURLs.removeAll()
@@ -215,11 +231,11 @@ final class WallpaperManager: ObservableObject {
                 }
             case .perDesktop:
                 if let id = displayID {
-                    youtubeURLs[DesktopKey(displayID: id, spaceID: activeSpaceID)] = urlString
+                    youtubeURLs[DesktopKey(displayID: id, spaceID: originSpaceID)] = urlString
                 }
             }
 
-            setWallpaper(url: localURL, for: displayID)
+            setWallpaper(url: localURL, for: displayID, spaceID: originSpaceID)
         }
     }
 
@@ -236,10 +252,10 @@ final class WallpaperManager: ObservableObject {
 
     /// Pick a random video from the entire Photos library and set it as wallpaper.
     func shuffleFromPhotos(for displayID: CGDirectDisplayID? = nil) {
-        // Activate so the system authorization prompt can appear
         NSApp.setActivationPolicy(.regular)
         NSApp.activate()
         loadingOverlay.show(message: "Shuffling...")
+        let originSpaceID = activeSpaceID
         Task {
             guard let url = await photosService.randomVideoURL() else {
                 loadingOverlay.hide()
@@ -249,7 +265,7 @@ final class WallpaperManager: ObservableObject {
             }
             loadingOverlay.hide()
             NSApp.setActivationPolicy(.accessory)
-            setWallpaper(url: url, for: displayID)
+            setWallpaper(url: url, for: displayID, spaceID: originSpaceID)
         }
     }
 
@@ -328,20 +344,8 @@ final class WallpaperManager: ObservableObject {
     func toggleMute() {
         isMuted.toggle()
         saveState()
-        // Update existing players in-place — no teardown/rebuild needed
         for controller in controllers.values {
-            applyMuteState(to: controller.panel.contentView)
-        }
-    }
-
-    private func applyMuteState(to view: NSView?) {
-        guard let view else { return }
-        if let videoView = view as? VideoPlayerNSView {
-            videoView.setMuted(isMuted)
-            return
-        }
-        for subview in view.subviews {
-            applyMuteState(to: subview)
+            controller.player?.isMuted = isMuted
         }
     }
 
@@ -407,6 +411,11 @@ final class WallpaperManager: ObservableObject {
                 youtubeURLs[key] = ytURL
             }
 
+            // Track this space so it appears in the per-desktop menu
+            if key.spaceID != 0 {
+                knownSpaces[key.displayID, default: []].insert(key.spaceID)
+            }
+
             if FileManager.default.fileExists(atPath: path) {
                 desktopFiles[key] = URL(filePath: path)
             } else if let ytURL = entry["youtubeURL"] as? String {
@@ -446,14 +455,12 @@ final class WallpaperManager: ObservableObject {
 
             guard let url = fileURL(for: displayID),
                   let type = fileType(for: url) else {
-                // No wallpaper — tear down if exists
                 if let controller = controllers.removeValue(forKey: displayID) {
                     controller.close()
                 }
                 continue
             }
 
-            // Reuse existing controller if same URL (avoids video reload flash)
             if let existing = controllers[displayID] {
                 if existing.currentURL == url {
                     existing.reposition(to: screen)
@@ -465,14 +472,29 @@ final class WallpaperManager: ObservableObject {
             let controller = WallpaperWindowController(screen: screen)
             switch type {
             case .video:
-                controller.show(content: VideoWallpaperView(url: url, isMuted: isMuted), url: url)
+                let view = VideoWallpaperView(url: url, isMuted: isMuted)
+                controller.show(content: view, url: url)
+                let key = desktopKey(for: displayID)
+                let resume = playbackPositions[key]
+                // Grab player reference and seek after the video has started loading.
+                // Two-stage: async to let SwiftUI create the NSView, then 0.3s for
+                // AVPlayerLooper to finish setup and the item to begin playback.
+                DispatchQueue.main.async { [weak controller] in
+                    guard let controller else { return }
+                    if let videoView = Self.findVideoView(in: controller.panel.contentView) {
+                        controller.player = videoView.player
+                    }
+                    guard let resume, resume.isValid, resume.seconds > 0.1 else { return }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak controller] in
+                        controller?.player?.seek(to: resume, toleranceBefore: .zero, toleranceAfter: .zero)
+                    }
+                }
             case .gif:
                 controller.show(content: GIFWallpaperView(url: url), url: url)
             }
             controllers[displayID] = controller
         }
 
-        // Remove controllers for disconnected displays
         for displayID in controllers.keys where !activeDisplays.contains(displayID) {
             controllers.removeValue(forKey: displayID)?.close()
         }
@@ -489,10 +511,30 @@ final class WallpaperManager: ObservableObject {
     }
 
     private func tearDownWindows() {
+        savePlaybackPositions()
         for controller in controllers.values {
             controller.close()
         }
         controllers.removeAll()
+    }
+
+    private static func findVideoView(in view: NSView?) -> VideoPlayerNSView? {
+        guard let view else { return nil }
+        if let v = view as? VideoPlayerNSView { return v }
+        for sub in view.subviews {
+            if let found = findVideoView(in: sub) { return found }
+        }
+        return nil
+    }
+
+    private func savePlaybackPositions() {
+        for (displayID, controller) in controllers {
+            guard controller.currentURL != nil else { continue }
+            let key = desktopKey(for: displayID)
+            if let time = controller.player?.currentTime(), time.isValid, time.seconds > 0 {
+                playbackPositions[key] = time
+            }
+        }
     }
 
     // MARK: - Screen Changes
@@ -539,7 +581,9 @@ final class WallpaperManager: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
+                self.savePlaybackPositions()
                 self.activeSpaceID = currentSpaceID()
+                self.trackCurrentSpace()
                 if self.mode == .allDesktops {
                     // Panels have .canJoinAllSpaces — no rebuild needed
                     return

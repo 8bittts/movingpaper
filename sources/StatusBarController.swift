@@ -231,11 +231,10 @@ final class StatusBarController {
                 menu.addItem(displayHeader)
             }
 
-            // Build numbered list: all spaces with wallpapers, plus the current space
             let spaces = wallpaperManager.spaceAssignments(for: display.id)
-            let currentInList = spaces.contains { $0.isCurrent }
 
             for (index, space) in spaces.enumerated() {
+                let hasWallpaper = space.fileName != "No MovingPaper"
                 let label = "Desktop \(index + 1) — \(space.fileName)"
                 let item = NSMenuItem(title: label, action: nil, keyEquivalent: "")
                 if space.isCurrent {
@@ -244,23 +243,12 @@ final class StatusBarController {
 
                 let sub = NSMenu()
                 if space.isCurrent {
-                    buildDisplaySubmenu(sub, displayID: display.id, includeRemove: true)
+                    buildDisplaySubmenu(sub, displayID: display.id, includeRemove: hasWallpaper)
                 } else {
                     let info = NSMenuItem(title: "Switch to this desktop to change", action: nil, keyEquivalent: "")
                     info.isEnabled = false
                     sub.addItem(info)
                 }
-                item.submenu = sub
-                menu.addItem(item)
-            }
-
-            if !currentInList {
-                let desktopNum = spaces.count + 1
-                let item = NSMenuItem(title: "Desktop \(desktopNum) — No MovingPaper", action: nil, keyEquivalent: "")
-                item.state = .on
-
-                let sub = NSMenu()
-                buildDisplaySubmenu(sub, displayID: display.id, includeRemove: false)
                 item.submenu = sub
                 menu.addItem(item)
             }

@@ -24,7 +24,7 @@ struct VideoWallpaperView: NSViewRepresentable {
 
 /// AppKit view hosting an AVPlayerLayer for hardware-accelerated video rendering.
 final class VideoPlayerNSView: NSView {
-    private var player: AVQueuePlayer?
+    private(set) var player: AVQueuePlayer?
     private var looper: AVPlayerLooper?
     private var playerLayer: AVPlayerLayer?
     private(set) var currentURL: URL?
@@ -45,7 +45,6 @@ final class VideoPlayerNSView: NSView {
     }
 
     func loadVideo(url: URL) {
-        // Tear down previous playback
         player?.pause()
         looper = nil
         player = nil
@@ -56,8 +55,6 @@ final class VideoPlayerNSView: NSView {
         let asset = AVURLAsset(url: url)
         let item = AVPlayerItem(asset: asset)
         let queuePlayer = AVQueuePlayer()
-
-        // AVPlayerLooper handles seamless gapless looping
         let playerLooper = AVPlayerLooper(player: queuePlayer, templateItem: item)
 
         let layer = AVPlayerLayer(player: queuePlayer)
