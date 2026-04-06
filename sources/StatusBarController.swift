@@ -242,53 +242,9 @@ final class StatusBarController {
                     item.state = .on
                 }
 
-                // Submenu with actions
                 let sub = NSMenu()
                 if space.isCurrent {
-                    let chooseItem = NSMenuItem(
-                        title: "Choose File...",
-                        action: #selector(chooseFileForDisplay(_:)),
-                        keyEquivalent: ""
-                    )
-                    chooseItem.target = self
-                    chooseItem.tag = Int(display.id)
-                    sub.addItem(chooseItem)
-
-                    let ytItem = NSMenuItem(
-                        title: "Paste YouTube URL...",
-                        action: #selector(pasteYouTubeURLForDisplay(_:)),
-                        keyEquivalent: ""
-                    )
-                    ytItem.target = self
-                    ytItem.tag = Int(display.id)
-                    sub.addItem(ytItem)
-
-                    let photosItem = NSMenuItem(
-                        title: "Choose from Photos...",
-                        action: #selector(chooseFromPhotosForDisplay(_:)),
-                        keyEquivalent: ""
-                    )
-                    photosItem.target = self
-                    photosItem.tag = Int(display.id)
-                    sub.addItem(photosItem)
-
-                    let shuffleItem = NSMenuItem(
-                        title: "Shuffle from Photos",
-                        action: #selector(shuffleFromPhotosForDisplay(_:)),
-                        keyEquivalent: ""
-                    )
-                    shuffleItem.target = self
-                    shuffleItem.tag = Int(display.id)
-                    sub.addItem(shuffleItem)
-
-                    let removeItem = NSMenuItem(
-                        title: "Remove",
-                        action: #selector(clearDisplayWallpaper(_:)),
-                        keyEquivalent: ""
-                    )
-                    removeItem.target = self
-                    removeItem.tag = Int(display.id)
-                    sub.addItem(removeItem)
+                    buildDisplaySubmenu(sub, displayID: display.id, includeRemove: true)
                 } else {
                     let info = NSMenuItem(title: "Switch to this desktop to change", action: nil, keyEquivalent: "")
                     info.isEnabled = false
@@ -298,49 +254,13 @@ final class StatusBarController {
                 menu.addItem(item)
             }
 
-            // If current space has no wallpaper, show it with actions
             if !currentInList {
                 let desktopNum = spaces.count + 1
                 let item = NSMenuItem(title: "Desktop \(desktopNum) — No MovingPaper", action: nil, keyEquivalent: "")
                 item.state = .on
 
                 let sub = NSMenu()
-                let chooseItem = NSMenuItem(
-                    title: "Choose File...",
-                    action: #selector(chooseFileForDisplay(_:)),
-                    keyEquivalent: ""
-                )
-                chooseItem.target = self
-                chooseItem.tag = Int(display.id)
-                sub.addItem(chooseItem)
-
-                let ytItem = NSMenuItem(
-                    title: "Paste YouTube URL...",
-                    action: #selector(pasteYouTubeURLForDisplay(_:)),
-                    keyEquivalent: ""
-                )
-                ytItem.target = self
-                ytItem.tag = Int(display.id)
-                sub.addItem(ytItem)
-
-                let photosItem = NSMenuItem(
-                    title: "Choose from Photos...",
-                    action: #selector(chooseFromPhotosForDisplay(_:)),
-                    keyEquivalent: ""
-                )
-                photosItem.target = self
-                photosItem.tag = Int(display.id)
-                sub.addItem(photosItem)
-
-                let shuffleItem = NSMenuItem(
-                    title: "Shuffle from Photos",
-                    action: #selector(shuffleFromPhotosForDisplay(_:)),
-                    keyEquivalent: ""
-                )
-                shuffleItem.target = self
-                shuffleItem.tag = Int(display.id)
-                sub.addItem(shuffleItem)
-
+                buildDisplaySubmenu(sub, displayID: display.id, includeRemove: false)
                 item.submenu = sub
                 menu.addItem(item)
             }
@@ -359,6 +279,29 @@ final class StatusBarController {
             )
             clearAllItem.target = self
             menu.addItem(clearAllItem)
+        }
+    }
+
+    // MARK: - Submenu Builder
+
+    private func buildDisplaySubmenu(_ menu: NSMenu, displayID: CGDirectDisplayID, includeRemove: Bool) {
+        let tag = Int(displayID)
+        for (title, action) in [
+            ("Choose File...", #selector(chooseFileForDisplay(_:))),
+            ("Paste YouTube URL...", #selector(pasteYouTubeURLForDisplay(_:))),
+            ("Choose from Photos...", #selector(chooseFromPhotosForDisplay(_:))),
+            ("Shuffle from Photos", #selector(shuffleFromPhotosForDisplay(_:))),
+        ] {
+            let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+            item.target = self
+            item.tag = tag
+            menu.addItem(item)
+        }
+        if includeRemove {
+            let item = NSMenuItem(title: "Remove", action: #selector(clearDisplayWallpaper(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = tag
+            menu.addItem(item)
         }
     }
 

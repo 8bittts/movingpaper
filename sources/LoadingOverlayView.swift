@@ -141,16 +141,17 @@ final class LoadingOverlayController {
 
     func hide() {
         guard let panel else { return }
-        let ref = panel
+        // Nil references immediately so a concurrent show() creates a fresh panel
+        // instead of updating the one being faded out.
+        self.panel = nil
+        self.hostingView = nil
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.25
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            ref.animator().alphaValue = 0
+            panel.animator().alphaValue = 0
         }, completionHandler: {
-            Task { @MainActor [weak self] in
-                ref.orderOut(nil)
-                self?.panel = nil
-                self?.hostingView = nil
+            Task { @MainActor in
+                panel.orderOut(nil)
             }
         })
     }

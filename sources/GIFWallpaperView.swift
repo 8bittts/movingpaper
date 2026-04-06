@@ -23,7 +23,6 @@ struct GIFWallpaperView: NSViewRepresentable {
 /// AppKit view that renders animated GIF frames into a CALayer.
 final class GIFAnimationNSView: NSView {
     private var imageLayer: CALayer?
-    private var animationStatus: OSStatus = noErr
     private var stopped = false
     private(set) var currentURL: URL?
 
@@ -53,7 +52,7 @@ final class GIFAnimationNSView: NSView {
         stopped = false
         currentURL = url
 
-        animationStatus = CGAnimateImageAtURLWithBlock(
+        _ = CGAnimateImageAtURLWithBlock(
             url as CFURL,
             nil
         ) { [weak self] _, cgImage, stop in

@@ -14,11 +14,21 @@
 
 ---
 
-## The Story
+## Why MovingPaper?
 
-I just wanted a simple way to animate my wallpaper while I code. No bloated app, no subscription, no electron wrapper; just a fully native macOS menu bar utility that plays a video or GIF behind my desktop windows. That's it. That's the whole project. Magic.
+Your desktop is yours. Why should it be a static photo?
 
-The name is literal: It's your wallpaper, but it moves. Moving (Wall) Paper. **MovingPaper**.
+MovingPaper turns your background into something alive -- a looping video, an animated GIF, a YouTube clip, or a random video from your Photos library. Everything else works exactly the same: icons, right-click menus, drag-and-drop, all of it. The animation just sits underneath.
+
+**A few ways people use it:**
+
+- **Podcast background** -- listening to a podcast while you work? Set a chill looping video and let the visual ambiance match the vibe. Your desktop becomes the world's most relaxed studio.
+- **Music visualizer** -- throw on a music video from YouTube as your wallpaper and code to the rhythm. It's like having MTV in the background, except it's 2026 and your wallpaper is the screen.
+- **Photos shuffle** -- hit Shuffle and MovingPaper pulls a random video from your entire Apple Photos library. Family clips, travel memories, skateboard fails -- your desktop is never the same twice.
+- **Aesthetic workspace** -- pixel art rain, fireplace loops, Japanese lo-fi scenes, slow-motion nature. Pick something beautiful and let it run.
+- **Multiple desktops** -- set a different vibe on each macOS Space. Work desktop gets the calm ocean. Personal desktop gets the anime loop. You do you.
+
+It's the kind of app that makes you smile every time you minimize a window.
 
 ---
 
@@ -30,33 +40,33 @@ The name is literal: It's your wallpaper, but it moves. Moving (Wall) Paper. **M
 
 Open the `.dmg`, drag **MovingPaper** to Applications, launch it. Look for the night sky icon in your menu bar -- that's it.
 
-> Code-signed with Developer ID and notarized by Apple. Auto-updates via Sparkle (EdDSA-signed appcast).
+> Code-signed with Developer ID and notarized by Apple. Auto-updates via Sparkle.
 
 ---
 
 ## What It Does
 
-Plays a looping video or GIF as your desktop background. Icons, right-click menus, drag-and-drop all work normally -- the animation sits underneath.
+Plays a looping video or GIF as your desktop background. Everything on your desktop still works normally -- the animation sits underneath.
 
-| Format | Extensions | Notes |
-|--------|-----------|-------|
-| Video  | `.mp4`, `.mov`, `.m4v` | Seamless looping, HEVC with alpha |
-| GIF    | `.gif` | Native frame timing |
-| YouTube | URL paste | Downloads via yt-dlp, plays as local MP4 |
-| Photos | Picker or Shuffle | Pick a video from your library, or shuffle a random one |
+| Source | How |
+|--------|-----|
+| **Video files** | `.mp4`, `.mov`, `.m4v` -- seamless looping, HEVC with alpha |
+| **GIFs** | `.gif` -- native frame timing |
+| **YouTube** | Paste any URL -- downloads and loops as wallpaper |
+| **Apple Photos** | Pick a video or shuffle a random one from your library |
 
 ## Features
 
-- **Photos library** -- pick a video from Photos, or shuffle a random video from your entire library
-- **YouTube wallpapers** -- paste a YouTube URL, video downloads and loops as your wallpaper
-- **Loading overlay** -- on-brand shimmer pill floats above all windows during downloads
-- **Per-desktop wallpapers** -- different wallpaper on each macOS Space and monitor, like native macOS
+- **Apple Photos integration** -- pick a video or shuffle a random one from your entire library
+- **YouTube wallpapers** -- paste a URL, it downloads and loops
+- **Loading overlay** -- on-brand shimmer pill floats above all windows so you always know what's happening
+- **Per-desktop wallpapers** -- different wallpaper on each macOS Space and monitor
 - **Sound control** -- mute or unmute video audio (muted by default)
-- **Multi-monitor** -- auto-detects displays, rebuilds on hot-plug
+- **Multi-monitor** -- auto-detects displays, adapts on hot-plug
 - **Power-aware** -- pauses on Low Power Mode and thermal throttling
-- **Auto-updates** -- checks hourly via Sparkle, EdDSA-verified
-- **Persistent settings** -- wallpapers restore on app relaunch
-- **Menu bar only** -- no Dock icon, no clutter
+- **Auto-updates** -- checks hourly via Sparkle
+- **Persistent** -- your wallpapers come back when you relaunch
+- **Menu bar only** -- no Dock icon, no clutter, no nonsense
 
 ## Menu
 
@@ -102,7 +112,7 @@ Version auto-increments on each release build (`0.001` -> `0.002` -> ...). The b
 
 ## How It Works
 
-A borderless `NSPanel` at `desktopWindow + 1` sits above the system wallpaper but below Finder icons. `ignoresMouseEvents = true` keeps the desktop interactive. Video loops via `AVQueuePlayer` + `AVPlayerLooper`. GIFs animate via `CGAnimateImageAtURLWithBlock`. Space changes are tracked via `CGSGetActiveSpace` + `activeSpaceDidChangeNotification` to swap per-desktop wallpapers.
+A borderless `NSPanel` at `desktopWindow + 1` sits above the system wallpaper but below Finder icons. `ignoresMouseEvents = true` keeps the desktop interactive. Video loops via `AVQueuePlayer` + `AVPlayerLooper`. GIFs animate via `CGAnimateImageAtURLWithBlock`. Space changes are tracked via `CGSGetActiveSpace` to swap per-desktop wallpapers without any visible flash.
 
 ## Tech Stack
 

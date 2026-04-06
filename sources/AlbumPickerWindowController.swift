@@ -42,9 +42,6 @@ final class PhotosPickerController: NSObject {
         window.contentViewController = pickerVC
         self.panel = window
 
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate()
-
         return await withCheckedContinuation { cont in
             self.continuation = cont
             window.makeKeyAndOrderFront(nil)
