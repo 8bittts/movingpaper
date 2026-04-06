@@ -49,6 +49,7 @@ Plays a looping video or GIF as your desktop background. Icons, right-click menu
 
 - **Photos library** -- pick a video from Photos, or shuffle a random video from your entire library
 - **YouTube wallpapers** -- paste a YouTube URL, video downloads and loops as your wallpaper
+- **Loading overlay** -- on-brand shimmer pill floats above all windows during downloads
 - **Per-desktop wallpapers** -- different wallpaper on each macOS Space and monitor, like native macOS
 - **Sound control** -- mute or unmute video audio (muted by default)
 - **Multi-monitor** -- auto-detects displays, rebuilds on hot-plug
@@ -66,9 +67,9 @@ Plays a looping video or GIF as your desktop background. Icons, right-click menu
 | **Choose from Photos...** | Pick a video from your Photos library |
 | **Shuffle from Photos** | Random video from your entire library |
 | **Sound: Off / On** | Toggle video audio |
-| **Wallpaper Mode** | All Desktops or Per Desktop |
+| **MovingPaper Mode** | All Desktops or Per Desktop |
 | **Pause / Resume** | Stop or restart playback |
-| **Remove Wallpaper** | Clear wallpaper |
+| **Remove MovingPaper** | Clear wallpaper |
 | **Check for Updates...** | Sparkle update check |
 | **Built with YEN** | Visit yen.chat |
 | **Quit MovingPaper** | Exit |

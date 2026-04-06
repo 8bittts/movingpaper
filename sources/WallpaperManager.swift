@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import SwiftUI
 
 /// How wallpapers are assigned.
 enum WallpaperMode: String {
@@ -70,6 +71,8 @@ final class WallpaperManager: ObservableObject {
     private var spaceObserver: Any?
     private var powerObservers: [Any] = []
     private var systemPaused: Bool = false
+    private let loadingOverlay = LoadingOverlayController()
+    private var downloadOverlayObserver: AnyCancellable?
     @Published private(set) var activeSpaceID: UInt64 = 0
 
     /// Original YouTube URLs for desktops using YouTube content (for re-download if cache cleared).
@@ -89,6 +92,7 @@ final class WallpaperManager: ObservableObject {
         observeScreenChanges()
         observeSpaceChanges()
         observePowerState()
+        observeDownloadState()
     }
 
     // MARK: - Computed Helpers
@@ -232,11 +236,14 @@ final class WallpaperManager: ObservableObject {
 
     /// Pick a random video from the entire Photos library and set it as wallpaper.
     func shuffleFromPhotos(for displayID: CGDirectDisplayID? = nil) {
+        loadingOverlay.show(message: "Shuffling...")
         Task {
             guard let url = await photosService.randomVideoURL() else {
+                loadingOverlay.hide()
                 showAlert(title: "No Videos Found", message: "Grant Photos access in System Settings or add videos to your library.")
                 return
             }
+            loadingOverlay.hide()
             setWallpaper(url: url, for: displayID)
         }
     }
@@ -333,6 +340,23 @@ final class WallpaperManager: ObservableObject {
         }
     }
 
+    // MARK: - Loading Overlay
+
+    private func observeDownloadState() {
+        downloadOverlayObserver = youtubeDownloader.$state
+            .receive(on: RunLoop.main)
+            .sink { [weak self] state in
+                guard let self else { return }
+                switch state {
+                case .downloading(let progress):
+                    let pct = Int(progress * 100)
+                    self.loadingOverlay.show(message: "Downloading \(pct)%", progress: progress)
+                case .idle, .failed:
+                    self.loadingOverlay.hide()
+                }
+            }
+    }
+
     // MARK: - Persistence
 
     private func saveState() {
@@ -404,25 +428,48 @@ final class WallpaperManager: ObservableObject {
     // MARK: - Window Lifecycle
 
     func rebuildAllWindows() {
-        tearDownWindows()
-        guard !isPaused else { return }
+        guard !isPaused else {
+            tearDownWindows()
+            return
+        }
+
+        var activeDisplays = Set<CGDirectDisplayID>()
 
         for screen in NSScreen.screens {
             guard let displayID = screen.displayID else { continue }
+            activeDisplays.insert(displayID)
 
-            guard let url = fileURL(for: displayID) else { continue }
-            guard let type = fileType(for: url) else { continue }
-
-            let controller = WallpaperWindowController(screen: screen)
-
-            switch type {
-            case .video:
-                controller.show(content: VideoWallpaperView(url: url, isMuted: isMuted))
-            case .gif:
-                controller.show(content: GIFWallpaperView(url: url))
+            guard let url = fileURL(for: displayID),
+                  let type = fileType(for: url) else {
+                // No wallpaper — tear down if exists
+                if let controller = controllers.removeValue(forKey: displayID) {
+                    controller.close()
+                }
+                continue
             }
 
+            // Reuse existing controller if same URL (avoids video reload flash)
+            if let existing = controllers[displayID] {
+                if existing.currentURL == url {
+                    existing.reposition(to: screen)
+                    continue
+                }
+                existing.close()
+            }
+
+            let controller = WallpaperWindowController(screen: screen)
+            switch type {
+            case .video:
+                controller.show(content: VideoWallpaperView(url: url, isMuted: isMuted), url: url)
+            case .gif:
+                controller.show(content: GIFWallpaperView(url: url), url: url)
+            }
             controllers[displayID] = controller
+        }
+
+        // Remove controllers for disconnected displays
+        for displayID in controllers.keys where !activeDisplays.contains(displayID) {
+            controllers.removeValue(forKey: displayID)?.close()
         }
     }
 
@@ -488,6 +535,10 @@ final class WallpaperManager: ObservableObject {
             Task { @MainActor in
                 guard let self else { return }
                 self.activeSpaceID = currentSpaceID()
+                if self.mode == .allDesktops {
+                    // Panels have .canJoinAllSpaces — no rebuild needed
+                    return
+                }
                 self.rebuildAllWindows()
             }
         }

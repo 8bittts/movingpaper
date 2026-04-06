@@ -102,7 +102,7 @@ final class StatusBarController {
         perItem.state = wallpaperManager.mode == .perDesktop ? .on : .off
         modeMenu.addItem(perItem)
 
-        let modeItem = NSMenuItem(title: "Wallpaper Mode", action: nil, keyEquivalent: "")
+        let modeItem = NSMenuItem(title: "MovingPaper Mode", action: nil, keyEquivalent: "")
         modeItem.submenu = modeMenu
         menu.addItem(modeItem)
 
@@ -168,7 +168,7 @@ final class StatusBarController {
             menu.addItem(.separator())
 
             let removeItem = NSMenuItem(
-                title: "Remove Wallpaper",
+                title: "Remove MovingPaper",
                 action: #selector(clearAllWallpapers),
                 keyEquivalent: ""
             )
@@ -301,7 +301,7 @@ final class StatusBarController {
             // If current space has no wallpaper, show it with actions
             if !currentInList {
                 let desktopNum = spaces.count + 1
-                let item = NSMenuItem(title: "Desktop \(desktopNum) — No Wallpaper", action: nil, keyEquivalent: "")
+                let item = NSMenuItem(title: "Desktop \(desktopNum) — No MovingPaper", action: nil, keyEquivalent: "")
                 item.state = .on
 
                 let sub = NSMenu()
@@ -353,7 +353,7 @@ final class StatusBarController {
         if wallpaperManager.hasAnyWallpaper {
             menu.addItem(.separator())
             let clearAllItem = NSMenuItem(
-                title: "Remove All Wallpapers",
+                title: "Remove All MovingPapers",
                 action: #selector(clearAllWallpapers),
                 keyEquivalent: ""
             )

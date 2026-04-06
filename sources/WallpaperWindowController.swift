@@ -6,7 +6,8 @@ import SwiftUI
 @MainActor
 final class WallpaperWindowController {
     let panel: WallpaperPanel
-    let screen: NSScreen
+    private(set) var screen: NSScreen
+    private(set) var currentURL: URL?
     private var hostingView: NSHostingView<AnyView>?
 
     init(screen: NSScreen) {
@@ -14,7 +15,9 @@ final class WallpaperWindowController {
         self.panel = WallpaperPanel(screen: screen)
     }
 
-    func show(content: some View) {
+    func show(content: some View, url: URL) {
+        self.currentURL = url
+
         let hosting = NSHostingView(rootView: AnyView(content))
         hosting.frame = panel.contentView?.bounds ?? screen.frame
         hosting.autoresizingMask = [.width, .height]
@@ -26,8 +29,9 @@ final class WallpaperWindowController {
         panel.orderFront(nil)
     }
 
-    func reposition(to screen: NSScreen) {
-        panel.setFrame(screen.frame, display: true)
+    func reposition(to newScreen: NSScreen) {
+        self.screen = newScreen
+        panel.setFrame(newScreen.frame, display: true)
     }
 
     func close() {
