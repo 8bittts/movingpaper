@@ -1,8 +1,10 @@
+import AppKit
 import Combine
 @preconcurrency import Sparkle
 
 /// Sparkle auto-updater wrapper for MovingPaper.
-/// Checks for updates via an appcast feed and handles EdDSA-signed releases.
+/// Uses Sparkle's standard UI (native macOS alerts) with activation policy
+/// management for menu-bar-only apps.
 @MainActor
 final class MovingPaperUpdater: NSObject, ObservableObject {
 
@@ -17,32 +19,23 @@ final class MovingPaperUpdater: NSObject, ObservableObject {
     @Published private(set) var status: UpdateStatus = .idle
     @Published private(set) var canCheckForUpdates = false
 
-    private let userDriver: MovingPaperUpdateDriver
-    private var updater: SPUUpdater?
+    private var updaterController: SPUStandardUpdaterController?
     private var cancellables = Set<AnyCancellable>()
     private var started = false
 
     override init() {
-        self.userDriver = MovingPaperUpdateDriver()
         super.init()
 
-        // Sparkle requires a valid app bundle with SUFeedURL + SUPublicEDKey.
-        // In dev (swift run), these are missing — updater stays dormant.
         guard Self.hostHasSparkleConfig() else { return }
 
-        userDriver.onStatusEvent = { [weak self] event in
-            self?.handle(event)
-        }
-
-        let updater = SPUUpdater(
-            hostBundle: Bundle.main,
-            applicationBundle: Bundle.main,
-            userDriver: userDriver,
-            delegate: userDriver
+        let controller = SPUStandardUpdaterController(
+            startingUpdater: false,
+            updaterDelegate: self,
+            userDriverDelegate: self
         )
-        self.updater = updater
+        self.updaterController = controller
 
-        updater
+        controller.updater
             .publisher(for: \.canCheckForUpdates)
             .receive(on: RunLoop.main)
             .sink { [weak self] value in
@@ -55,10 +48,10 @@ final class MovingPaperUpdater: NSObject, ObservableObject {
     func start() {
         guard !started else { return }
         started = true
-        guard let updater else { return }
+        guard let controller = updaterController else { return }
 
         do {
-            try updater.start()
+            try controller.updater.start()
         } catch {
             status = .error(message: "Updater failed to start: \(error.localizedDescription)")
         }
@@ -66,13 +59,13 @@ final class MovingPaperUpdater: NSObject, ObservableObject {
 
     /// Trigger a manual update check (user-initiated).
     func checkForUpdates() {
-        guard let updater else {
+        guard let controller = updaterController else {
             status = .error(message: "Updates unavailable in development builds.")
             return
         }
 
         status = .checking
-        updater.checkForUpdates()
+        controller.updater.checkForUpdates()
     }
 
     // MARK: - Host Validation
@@ -90,16 +83,39 @@ final class MovingPaperUpdater: NSObject, ObservableObject {
               !pubKey.isEmpty else { return false }
         return true
     }
+}
 
-    private func handle(_ event: MovingPaperUpdateStatusEvent) {
-        switch event {
-        case .available(let version):
-            status = .available(version: version)
-        case .upToDate:
-            status = .upToDate
-        case .aborted(let message):
-            guard case .checking = status else { return }
-            status = .error(message: message)
-        }
+// MARK: - SPUUpdaterDelegate
+
+@MainActor
+extension MovingPaperUpdater: SPUUpdaterDelegate {
+
+    func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        let version = item.displayVersionString.isEmpty ? item.versionString : item.displayVersionString
+        status = .available(version: version)
+    }
+
+    func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: any Error) {
+        status = .upToDate
+    }
+
+    func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {
+        status = .error(message: (error as NSError).localizedDescription)
+    }
+}
+
+// MARK: - SPUStandardUserDriverDelegate
+
+@MainActor
+extension MovingPaperUpdater: @preconcurrency SPUStandardUserDriverDelegate {
+
+    func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool, forUpdate update: SUAppcastItem, state: SPUUserUpdateState) {
+        guard handleShowingUpdate else { return }
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func standardUserDriverWillFinishUpdateSession() {
+        NSApp.setActivationPolicy(.accessory)
     }
 }
