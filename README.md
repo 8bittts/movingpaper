@@ -105,10 +105,10 @@ swift test
 ./scripts/build-dmg.sh --build-only     # assemble release app bundle only
 ./scripts/build-dmg.sh --local          # build + sign + DMG, skip notarization
 ./scripts/build-dmg.sh --unsigned       # ad-hoc sign, no Developer ID
-./scripts/release-movingpaper.sh        # bump + package + notarize + tag + GitHub release
+./scripts/release-movingpaper.sh        # bump + package + notarize + tag + GitHub release with DMG, checksum, and signed appcast
 ```
 
-Use `./script/build_and_run.sh` for local iteration so MovingPaper launches as a real `.app` bundle with Sparkle metadata, signed-feed enforcement, verify-before-extraction enabled, and embedded frameworks. The repo now vendors Sparkle 2.9.1 so signed feed generation and validation work end-to-end. `swift run MovingPaper` is still fine for general app codepaths, but Sparkle stays dormant there because it is not a fully staged app bundle. `./scripts/build-dmg.sh` is now packaging-only, and `./scripts/release-movingpaper.sh` owns the version bump (`0.001` -> `0.002` -> ...) plus tag, README, and GitHub Release updates after the artifact build succeeds.
+Use `./script/build_and_run.sh` for local iteration so MovingPaper launches as a real `.app` bundle with Sparkle metadata, signed-feed enforcement, verify-before-extraction enabled, and embedded frameworks. The repo now vendors Sparkle 2.9.1 so signed feed generation and validation work end-to-end. `swift run MovingPaper` is still fine for general app codepaths, but Sparkle stays dormant there because it is not a fully staged app bundle. `./scripts/build-dmg.sh` is now packaging-only, and `./scripts/release-movingpaper.sh` owns the version bump (`0.001` -> `0.002` -> ...), tag, README, GitHub Release update, and upload of the DMG, checksum, and signed `appcast.xml` asset after the artifact build succeeds.
 
 ---
 
