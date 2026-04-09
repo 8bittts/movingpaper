@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <!-- version-badge -->v0.026<!-- /version-badge --> · macOS 15+ · Swift 6 · MIT
+  <!-- version-badge -->v0.027<!-- /version-badge --> · macOS 15+ · Swift 6 · MIT
 </p>
 
 ---
@@ -35,7 +35,7 @@ It's the kind of app that makes you smile every time you minimize a window.
 ## Download
 
 <!-- download-link -->
-[**Download MovingPaper v0.026**](https://github.com/8bittts/movingpaper/releases/download/v0.026/MovingPaper-0.026.dmg)
+[**Download MovingPaper v0.027**](https://github.com/8bittts/movingpaper/releases/download/v0.027/MovingPaper-0.027.dmg)
 <!-- /download-link -->
 
 Open the `.dmg`, drag **MovingPaper** to Applications, launch it. Look for the night sky icon in your menu bar -- that's it.
