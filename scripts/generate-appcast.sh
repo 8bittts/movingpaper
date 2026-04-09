@@ -83,6 +83,10 @@ release_notes_html() {
     ul { padding-left: 20px; margin: 0; }
     li { margin-bottom: 6px; font-size: 13px; }
     .footer { margin-top: 16px; font-size: 11px; color: #86868b; }
+    @media (prefers-color-scheme: dark) {
+        body { color: #f5f5f7; }
+        .footer { color: #a1a1a6; }
+    }
 </style>
 <h2>What's New</h2>
 <ul>
