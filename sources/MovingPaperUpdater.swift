@@ -21,6 +21,7 @@ final class MovingPaperUpdater: NSObject, ObservableObject {
     private var updaterController: SPUStandardUpdaterController?
     private var cancellables = Set<AnyCancellable>()
     private var started = false
+    private let presentationCoordinator = SparklePresentationCoordinator()
 
     override init() {
         super.init()
@@ -64,13 +65,9 @@ final class MovingPaperUpdater: NSObject, ObservableObject {
             status = .error(message: "Updates unavailable in development builds.")
             return
         }
-        bringSparkleUIToFront()
+        presentationCoordinator.beginUserInitiatedCheck()
         status = .checking
         controller.updater.checkForUpdates()
-    }
-
-    private func bringSparkleUIToFront() {
-        NSApp.activate(ignoringOtherApps: true)
     }
 
     // MARK: - Host Validation
@@ -114,11 +111,15 @@ extension MovingPaperUpdater: @preconcurrency SPUUpdaterDelegate {
 extension MovingPaperUpdater: @preconcurrency SPUStandardUserDriverDelegate {
 
     func standardUserDriverWillShowModalAlert() {
-        bringSparkleUIToFront()
+        presentationCoordinator.willShowModalAlert()
     }
 
     func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool, forUpdate update: SUAppcastItem, state: SPUUserUpdateState) {
         guard handleShowingUpdate else { return }
-        bringSparkleUIToFront()
+        presentationCoordinator.willShowUpdate()
+    }
+
+    func standardUserDriverWillFinishUpdateSession() {
+        presentationCoordinator.finishUpdateSession()
     }
 }

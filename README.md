@@ -65,9 +65,9 @@ Plays a looping video or GIF as your desktop background. Everything on your desk
 - **Sound control** -- mute or unmute video audio (muted by default)
 - **Multi-monitor** -- auto-detects displays, adapts on hot-plug
 - **Power-aware** -- pauses on Low Power Mode and thermal throttling
-- **Auto-updates** -- checks hourly via Sparkle and brings update alerts to the front without temporarily surfacing a Dock icon
+- **Auto-updates** -- checks hourly via Sparkle; no-update alerts stay dockless, and real update sessions temporarily surface the app so Sparkle can present install UI correctly
 - **Persistent** -- your wallpapers come back when you relaunch
-- **Menu bar only** -- no Dock icon, no clutter, no nonsense, even when checking for updates
+- **Menu bar only** -- no Dock icon during normal use; Sparkle only surfaces the app temporarily while an update session is active
 
 ## Menu
 
@@ -81,7 +81,7 @@ Plays a looping video or GIF as your desktop background. Everything on your desk
 | **MovingPaper Mode** | All Desktops or Per Desktop |
 | **Pause / Resume** | Stop or restart playback |
 | **Remove MovingPaper** | Clear wallpaper |
-| **Check for Updates...** | Sparkle update check that stays menu-bar-only and foregrounds its notice when it appears |
+| **Check for Updates...** | Sparkle update check; if an update is available, MovingPaper temporarily surfaces so Sparkle's install window can be focused |
 | **Built with YEN** | Visit yen.chat |
 | **Quit MovingPaper** | Exit |
 
