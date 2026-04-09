@@ -65,7 +65,7 @@ Plays a looping video or GIF as your desktop background. Everything on your desk
 - **Sound control** -- mute or unmute video audio (muted by default)
 - **Multi-monitor** -- auto-detects displays, adapts on hot-plug
 - **Power-aware** -- pauses on Low Power Mode and thermal throttling
-- **Automatic update checks** -- checks hourly via Sparkle using a custom app-owned updater dialog that stays dockless
+- **Automatic update checks** -- checks hourly via Sparkle using a custom app-owned updater dialog that stays dockless, with signed feeds and verify-before-extraction enabled in staged builds
 - **Persistent** -- your wallpapers come back when you relaunch
 - **Menu bar only** -- no Dock icon during normal use, update checks, or update install prompts
 
@@ -108,7 +108,7 @@ swift test
 ./scripts/release-movingpaper.sh        # bump + package + notarize + tag + GitHub release
 ```
 
-Use `./script/build_and_run.sh` for local iteration so MovingPaper launches as a real `.app` bundle with Sparkle metadata, verify-before-extraction enabled, and embedded frameworks. `swift run MovingPaper` is still fine for general app codepaths, but Sparkle stays dormant there because it is not a fully staged app bundle. `./scripts/build-dmg.sh` is now packaging-only, and `./scripts/release-movingpaper.sh` owns the version bump (`0.001` -> `0.002` -> ...) plus tag, README, and GitHub Release updates after the artifact build succeeds.
+Use `./script/build_and_run.sh` for local iteration so MovingPaper launches as a real `.app` bundle with Sparkle metadata, signed-feed enforcement, verify-before-extraction enabled, and embedded frameworks. The repo now vendors Sparkle 2.9.1 so signed feed generation and validation work end-to-end. `swift run MovingPaper` is still fine for general app codepaths, but Sparkle stays dormant there because it is not a fully staged app bundle. `./scripts/build-dmg.sh` is now packaging-only, and `./scripts/release-movingpaper.sh` owns the version bump (`0.001` -> `0.002` -> ...) plus tag, README, and GitHub Release updates after the artifact build succeeds.
 
 ---
 
@@ -127,7 +127,7 @@ A borderless `NSPanel` at `desktopWindow + 1` sits above the system wallpaper bu
 | Photos | PhotosUI (`PHPickerViewController`) + PhotoKit (shuffle) |
 | GIF | ImageIO (`CGAnimateImageAtURLWithBlock`) |
 | Desktop tracking | CoreGraphics private APIs (`CGSCopyManagedDisplaySpaces`, `CGSGetActiveSpace`) |
-| Updates | [Sparkle](https://sparkle-project.org) (EdDSA-signed appcast, verify-before-extraction, vendored) |
+| Updates | [Sparkle](https://sparkle-project.org) 2.9.1 (EdDSA-signed feed, signed archives, signed-feed enforcement, verify-before-extraction, vendored) |
 | Signing | Developer ID + Apple notarization |
 
 ## Contributing

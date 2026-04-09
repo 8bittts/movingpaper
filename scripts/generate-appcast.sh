@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
 #
-# generate-appcast.sh — Generate a Sparkle appcast.xml for MovingPaper.
+# generate-appcast.sh — Generate a signed Sparkle appcast.xml for MovingPaper.
 #
 # Usage:
 #   ./scripts/generate-appcast.sh
 #
-# Reads version/build from the built app bundle in build/, signs the DMG
-# with Sparkle's EdDSA tool, and outputs build/appcast.xml.
+# Reads version/build from the built app bundle in build/, prepares embedded
+# release notes for the current DMG, and generates a signed appcast.xml using
+# Sparkle's generate_appcast tool.
 #
 # Environment:
 #   MOVINGPAPER_APPCAST_DOWNLOAD_BASE   Override base URL for DMG download
 #                                        (default: GitHub Releases)
+#   SPARKLE_ED_KEYCHAIN_ACCOUNT         Keychain account name for the private
+#                                        Ed25519 key (default: ed25519)
+#   SPARKLE_ED_PRIVATE_KEY_FILE         Optional path to a private Ed25519 key
+#                                        file for feed signing
+#   SPARKLE_PRIVATE_ED_KEY              Optional private Ed25519 key string.
+#                                        When set, this is piped to
+#                                        generate_appcast via stdin.
 
 set -euo pipefail
 
@@ -21,7 +29,7 @@ cd "$REPO_ROOT"
 
 APP_NAME="MovingPaper"
 GITHUB_REPO="8bittts/movingpaper"
-SIGN_TOOL="tools/sparkle/bin/sign_update"
+APPCAST_TOOL="tools/sparkle/bin/generate_appcast"
 PLIST_BUDDY="/usr/libexec/PlistBuddy"
 
 APP_BUNDLE="build/${APP_NAME}.app"
@@ -37,48 +45,28 @@ fail()  { printf "\033[1;31mERROR:\033[0m %s\n" "$1" >&2; exit 1; }
 # ── Validate ─────────────────────────────────────────────────────────────────
 
 [ -d "$APP_BUNDLE" ] || fail "App bundle not found at $APP_BUNDLE — run build-dmg.sh first"
-[ -x "$SIGN_TOOL" ] || fail "Sparkle sign_update tool not found at $SIGN_TOOL"
+[ -x "$APPCAST_TOOL" ] || fail "Sparkle generate_appcast tool not found at $APPCAST_TOOL"
 
-# ── Extract metadata ────────────────────────────────────────────────────────
+# ── Extract metadata ─────────────────────────────────────────────────────────
 
 VERSION="$("$PLIST_BUDDY" -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")"
 BUILD_NUMBER="$("$PLIST_BUDDY" -c 'Print :CFBundleVersion' "$INFO_PLIST")"
-MIN_MACOS="$("$PLIST_BUDDY" -c 'Print :LSMinimumSystemVersion' "$INFO_PLIST")"
 
 DMG_FILENAME="${APP_NAME}-${VERSION}.dmg"
 DMG_PATH="build/${DMG_FILENAME}"
 
 [ -f "$DMG_PATH" ] || fail "DMG not found at $DMG_PATH"
 
-info "Generating appcast for MovingPaper v${VERSION} (build ${BUILD_NUMBER})"
+info "Generating signed appcast for MovingPaper v${VERSION} (build ${BUILD_NUMBER})"
 
 # ── Download URL ─────────────────────────────────────────────────────────────
 
 DOWNLOAD_BASE="${MOVINGPAPER_APPCAST_DOWNLOAD_BASE:-https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}}"
-DOWNLOAD_URL="${DOWNLOAD_BASE}/${DMG_FILENAME}"
+DOWNLOAD_PREFIX="${DOWNLOAD_BASE%/}/"
+DOWNLOAD_URL="${DOWNLOAD_PREFIX}${DMG_FILENAME}"
 step "Download URL: ${DOWNLOAD_URL}"
 
-# ── File size ────────────────────────────────────────────────────────────────
-
-FILE_SIZE=$(stat -f%z "$DMG_PATH")
-step "File size: ${FILE_SIZE} bytes"
-
-# ── EdDSA signature ─────────────────────────────────────────────────────────
-
-info "Signing DMG with Sparkle EdDSA"
-sign_output="$("$SIGN_TOOL" "$DMG_PATH" 2>&1)"
-ed_signature="$(printf '%s\n' "$sign_output" | grep -o 'sparkle:edSignature="[^"]*"' | /usr/bin/sed 's/sparkle:edSignature="\([^"]*\)"/\1/' | head -1)"
-
-if [ -z "$ed_signature" ]; then
-    fail "Failed to generate EdDSA signature. Output: $sign_output"
-fi
-step "EdDSA signature: ${ed_signature:0:40}..."
-
-# ── Publication date ─────────────────────────────────────────────────────────
-
-pub_date="$(date -u '+%a, %d %b %Y %H:%M:%S +0000')"
-
-# ── Release notes (from git history) ──────────────────────────────────────
+# ── Release notes (from git history) ────────────────────────────────────────
 
 release_notes_html() {
     local ver="$1"
@@ -106,8 +94,6 @@ HTML
 generate_release_notes() {
     local ver="$1"
 
-    # Override: SPARKLE_NOTES_SINCE=v0.008 to diff from a specific tag
-    # Override: SPARKLE_NOTES="line1\nline2" to set notes directly
     if [ -n "${SPARKLE_NOTES:-}" ]; then
         local items=""
         while IFS= read -r line; do
@@ -123,7 +109,6 @@ NOTES
         return
     fi
 
-    # Find the previous release tag to diff against
     local prev_tag
     if [ -n "${SPARKLE_NOTES_SINCE:-}" ]; then
         prev_tag="$SPARKLE_NOTES_SINCE"
@@ -131,8 +116,6 @@ NOTES
         prev_tag=$(git tag --sort=-v:refname | grep '^v' | grep -vx "v${ver}" | head -1)
     fi
 
-    # Get user-facing commit messages since the last tag
-    # Filter out internal/developer commits — only keep feat/fix/feature work
     local commits=""
     if [ -n "$prev_tag" ]; then
         commits=$(git log "${prev_tag}..HEAD" --pretty=format:"%s" --no-merges 2>/dev/null \
@@ -159,19 +142,15 @@ NOTES
             | head -6)
     fi
 
-    # If no user-facing commits, use a friendly default
     if [ -z "$commits" ]; then
         commits="Bug fixes and performance improvements"
     fi
 
-    # Build HTML list items — strip prefixes and capitalize first letter
     local items=""
     while IFS= read -r msg; do
         [ -z "$msg" ] && continue
-        # Strip conventional commit prefixes (feat:, fix:, etc.)
         local clean
         clean=$(echo "$msg" | sed 's/^[a-z]*: *//')
-        # Capitalize first letter using awk (portable across macOS/Linux)
         clean=$(echo "$clean" | awk '{$1=toupper(substr($1,1,1)) substr($1,2)} 1')
         items="${items}    <li>${clean}</li>\n"
     done <<< "$commits"
@@ -179,39 +158,65 @@ NOTES
     release_notes_html "$ver" "$items"
 }
 
-# ── Generate appcast XML ────────────────────────────────────────────────────
+# ── Prepare archive staging directory ────────────────────────────────────────
 
-cat > "$OUTPUT" <<APPCAST
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0"
-     xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
-     xmlns:dc="http://purl.org/dc/elements/1.1/">
-    <channel>
-        <title>MovingPaper Updates</title>
-        <description>MovingPaper update feed.</description>
-        <language>en</language>
-        <item>
-            <title>MovingPaper ${VERSION}</title>
-            <sparkle:version>${BUILD_NUMBER}</sparkle:version>
-            <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>${MIN_MACOS}</sparkle:minimumSystemVersion>
-            <pubDate>${pub_date}</pubDate>
-            <description><![CDATA[
-$(generate_release_notes "$VERSION")
-            ]]></description>
-            <enclosure
-                url="${DOWNLOAD_URL}"
-                length="${FILE_SIZE}"
-                type="application/x-apple-diskimage"
-                sparkle:edSignature="${ed_signature}" />
-        </item>
-    </channel>
-</rss>
-APPCAST
+ARCHIVES_DIR="$(mktemp -d "${TMPDIR:-/tmp}/movingpaper-appcast.XXXXXX")"
+cleanup() {
+    rm -rf "$ARCHIVES_DIR"
+}
+trap cleanup EXIT
 
-# Validate XML
-if command -v xmllint &>/dev/null; then
+cp "$DMG_PATH" "${ARCHIVES_DIR}/${DMG_FILENAME}"
+NOTES_FILE="${ARCHIVES_DIR}/${APP_NAME}-${VERSION}.html"
+generate_release_notes "$VERSION" > "$NOTES_FILE"
+step "Prepared release notes: ${NOTES_FILE}"
+
+# ── Build generate_appcast command ──────────────────────────────────────────
+
+GENERATE_CMD=(
+    "$APPCAST_TOOL"
+    --account "${SPARKLE_ED_KEYCHAIN_ACCOUNT:-ed25519}"
+    --download-url-prefix "$DOWNLOAD_PREFIX"
+    --embed-release-notes
+    -o "$OUTPUT"
+    "$ARCHIVES_DIR"
+)
+
+if [ -n "${SPARKLE_ED_PRIVATE_KEY_FILE:-}" ]; then
+    GENERATE_CMD=(
+        "$APPCAST_TOOL"
+        --ed-key-file "${SPARKLE_ED_PRIVATE_KEY_FILE}"
+        --download-url-prefix "$DOWNLOAD_PREFIX"
+        --embed-release-notes
+        -o "$OUTPUT"
+        "$ARCHIVES_DIR"
+    )
+fi
+
+# ── Generate signed appcast ─────────────────────────────────────────────────
+
+if [ -n "${SPARKLE_PRIVATE_ED_KEY:-}" ]; then
+    info "Generating signed appcast from stdin-provided Ed25519 key"
+    printf '%s\n' "$SPARKLE_PRIVATE_ED_KEY" | "${GENERATE_CMD[@]}"
+else
+    info "Generating signed appcast"
+    "${GENERATE_CMD[@]}"
+fi
+
+[ -f "$OUTPUT" ] || fail "Appcast generation failed: missing ${OUTPUT}"
+
+if command -v xmllint >/dev/null 2>&1; then
     xmllint --noout "$OUTPUT" 2>&1 && step "XML validated"
 fi
 
-info "Appcast generated: ${OUTPUT}"
+REQUIRE_SIGNED_FEED="$("$PLIST_BUDDY" -c 'Print :SURequireSignedFeed' "$INFO_PLIST" 2>/dev/null || echo false)"
+if [ "$REQUIRE_SIGNED_FEED" = "true" ]; then
+    if grep -q "sparkle-signatures:" "$OUTPUT"; then
+        step "Verified embedded Sparkle feed signature"
+    else
+        fail "Signed feed required, but ${OUTPUT} is missing Sparkle's embedded feed signature block"
+    fi
+fi
+
+step "Appcast written to ${OUTPUT}"
+step "Signed feed generation complete"

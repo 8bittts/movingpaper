@@ -232,6 +232,7 @@ plist_set "$INFO_PLIST" "SUFeedURL" string "$SPARKLE_FEED_URL"
 plist_set "$INFO_PLIST" "SUPublicEDKey" string "$SPARKLE_PUBLIC_ED_KEY"
 plist_set "$INFO_PLIST" "SUScheduledCheckInterval" integer 3600
 plist_set "$INFO_PLIST" "SUVerifyUpdateBeforeExtraction" bool true
+plist_set "$INFO_PLIST" "SURequireSignedFeed" bool true
 step "Generated Info.plist"
 
 step "App bundle assembled at ${APP_BUNDLE}"
