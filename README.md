@@ -65,7 +65,7 @@ Plays a looping video or GIF as your desktop background. Everything on your desk
 - **Sound control** -- mute or unmute video audio (muted by default)
 - **Multi-monitor** -- auto-detects displays, adapts on hot-plug
 - **Power-aware** -- pauses on Low Power Mode and thermal throttling
-- **Auto-updates** -- checks hourly via Sparkle without temporarily surfacing a Dock icon for update alerts
+- **Auto-updates** -- checks hourly via Sparkle and brings update alerts to the front without temporarily surfacing a Dock icon
 - **Persistent** -- your wallpapers come back when you relaunch
 - **Menu bar only** -- no Dock icon, no clutter, no nonsense, even when checking for updates
 
@@ -81,7 +81,7 @@ Plays a looping video or GIF as your desktop background. Everything on your desk
 | **MovingPaper Mode** | All Desktops or Per Desktop |
 | **Pause / Resume** | Stop or restart playback |
 | **Remove MovingPaper** | Clear wallpaper |
-| **Check for Updates...** | Sparkle update check that stays menu-bar-only |
+| **Check for Updates...** | Sparkle update check that stays menu-bar-only and foregrounds its notice when it appears |
 | **Built with YEN** | Visit yen.chat |
 | **Quit MovingPaper** | Exit |
 
@@ -108,7 +108,7 @@ swift test
 ./scripts/release-movingpaper.sh        # bump + package + notarize + tag + GitHub release
 ```
 
-Use `./script/build_and_run.sh` for local iteration so MovingPaper launches as a real `.app` bundle with Sparkle metadata and embedded frameworks. `./scripts/build-dmg.sh` is now packaging-only, and `./scripts/release-movingpaper.sh` owns the version bump (`0.001` -> `0.002` -> ...) plus tag, README, and GitHub Release updates after the artifact build succeeds.
+Use `./script/build_and_run.sh` for local iteration so MovingPaper launches as a real `.app` bundle with Sparkle metadata and embedded frameworks. `swift run MovingPaper` is still fine for general app codepaths, but Sparkle stays dormant there because it is not a fully staged app bundle. `./scripts/build-dmg.sh` is now packaging-only, and `./scripts/release-movingpaper.sh` owns the version bump (`0.001` -> `0.002` -> ...) plus tag, README, and GitHub Release updates after the artifact build succeeds.
 
 ---
 
