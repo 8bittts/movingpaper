@@ -14,6 +14,8 @@ DerivedData/
 .swiftpm/
 *.xcodeproj/xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
+CLAUDE.md
+AGENTS.md
 .claude/commands/
 .codex/
 tools/yt-dlp/yt-dlp
