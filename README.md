@@ -138,8 +138,6 @@ A borderless `NSPanel` at `desktopWindow + 1` sits above the system wallpaper bu
 
 Fork, branch, `swift test`, PR. One feature or fix per PR.
 
-[video src="https://github.com/8bittts/movingpaper/raw/main/build/test-wallpaper.mov" width="100%" autoplay loop muted playsinline>[/video]
-
 ## License
 
 [MIT](LICENSE)
