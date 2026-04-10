@@ -22,6 +22,7 @@ final class MovingPaperUpdater: NSObject, ObservableObject {
     private var updaterController: SPUStandardUpdaterController?
     private var cancellables = Set<AnyCancellable>()
     private var started = false
+    private var windowObserver: Any?
 
     override init() {
         super.init()
@@ -65,7 +66,32 @@ final class MovingPaperUpdater: NSObject, ObservableObject {
         }
 
         status = .checking
+        startFloatingWindows()
         controller.updater.checkForUpdates()
+    }
+
+    // MARK: - Window Level
+
+    /// Float Sparkle's dialogs above all windows so they aren't buried.
+    private func startFloatingWindows() {
+        guard windowObserver == nil else { return }
+        windowObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: nil,
+            queue: .main
+        ) { notification in
+            guard let window = notification.object as? NSWindow else { return }
+            MainActor.assumeIsolated {
+                window.level = .floating
+            }
+        }
+    }
+
+    private func stopFloatingWindows() {
+        if let observer = windowObserver {
+            NotificationCenter.default.removeObserver(observer)
+            windowObserver = nil
+        }
     }
 
     // MARK: - Host Validation
@@ -113,9 +139,11 @@ extension MovingPaperUpdater: @preconcurrency SPUStandardUserDriverDelegate {
         guard handleShowingUpdate else { return }
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+        startFloatingWindows()
     }
 
     func standardUserDriverWillFinishUpdateSession() {
+        stopFloatingWindows()
         NSApp.setActivationPolicy(.accessory)
     }
 }
