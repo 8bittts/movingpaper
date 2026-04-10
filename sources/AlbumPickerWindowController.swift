@@ -9,7 +9,6 @@ final class PhotosPickerController: NSObject {
 
     private var panel: NSPanel?
     private var continuation: CheckedContinuation<URL?, Never>?
-    private var picker: PHPickerViewController?
 
     /// Tracks whether a picker is currently showing to prevent duplicates.
     static var isShowing = false
@@ -25,7 +24,6 @@ final class PhotosPickerController: NSObject {
 
         let pickerVC = PHPickerViewController(configuration: config)
         pickerVC.delegate = self
-        self.picker = pickerVC
 
         let window = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 900, height: 640),

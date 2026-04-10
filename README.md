@@ -133,6 +133,7 @@ A borderless `NSPanel` at `desktopWindow + 1` sits above the system wallpaper bu
 | Desktop tracking | CoreGraphics private APIs (`CGSCopyManagedDisplaySpaces`, `CGSGetActiveSpace`) |
 | Updates | [Sparkle](https://sparkle-project.org) 2.9.1 (EdDSA-signed feed, signed archives, signed-feed enforcement, verify-before-extraction, vendored) |
 | Signing | Developer ID + Apple notarization |
+| Static analysis | [Periphery](https://github.com/peripheryapp/periphery) (unused code detection) |
 
 ## Contributing
 

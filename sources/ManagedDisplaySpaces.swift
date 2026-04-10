@@ -6,10 +6,10 @@ import Foundation
 private func CGSMainConnectionID() -> UInt32
 
 @_silgen_name("CGSGetActiveSpace")
-private func CGSGetActiveSpace(_ cid: UInt32) -> UInt64
+private func CGSGetActiveSpace(_: UInt32) -> UInt64
 
 @_silgen_name("CGSCopyManagedDisplaySpaces")
-private func CGSCopyManagedDisplaySpaces(_ cid: UInt32) -> CFArray
+private func CGSCopyManagedDisplaySpaces(_: UInt32) -> CFArray
 
 /// Snapshot of the current active and known Spaces for each connected display.
 struct ManagedDisplaySpacesSnapshot: Equatable {
