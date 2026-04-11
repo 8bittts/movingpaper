@@ -1,13 +1,9 @@
 .DS_Store
 /.build
-/build/*
-!/build/movingpaper.png
-!/build/movingpaper-dmg-background.png
-!/build/banner.png
-!/build/yen.png
-!/build/test-wallpaper.gif
-!/build/test-wallpaper.mov
-!/build/test-wallpaper.mp4
+/build/MovingPaper.app/
+/build/dmg-staging/
+/build/*.dmg
+/build/*.sha256
 /Packages
 xcuserdata/
 DerivedData/
