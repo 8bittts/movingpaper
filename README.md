@@ -110,7 +110,7 @@ swift test
 ./scripts/release-movingpaper.sh        # bump + package + notarize + tag + GitHub release with DMG, checksum, and signed appcast
 ```
 
-The `build/tests/` folder contains example wallpaper videos and GIFs you can load into MovingPaper to try it out. More samples will be added over time.
+Don't have any videos or GIFs on-hand? The `build/tests/` folder ships with a few sample wallpapers you can load into MovingPaper to try it out. More will be added over time.
 
 Use `./scripts/build_and_run.sh` for local iteration so MovingPaper launches as a real `.app` bundle with Sparkle metadata, signed-feed enforcement, verify-before-extraction enabled, and embedded frameworks. The repo now vendors Sparkle 2.9.1 so signed feed generation and validation work end-to-end. `swift run MovingPaper` is still fine for general app codepaths, but Sparkle stays dormant there because it is not a fully staged app bundle. `./scripts/build-dmg.sh` is packaging-only, and `./scripts/release-movingpaper.sh` owns the version bump (`0.001` -> `0.002` -> ...), tag, README, GitHub Release update, upload of the DMG, checksum, and signed `appcast.xml` asset, and a final propagation check against the live `latest/download/appcast.xml` URL before the release is considered complete.
 
