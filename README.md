@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <!-- version-badge -->v0.031<!-- /version-badge --> · macOS 15+ · Swift 6 · MIT · <a href="https://x.com/8BIT/status/2043384259482902603">DEMO</a>
+  <!-- version-badge -->v0.031<!-- /version-badge --> · macOS 15+ · Swift 6 · MIT · <a href="https://x.com/8BIT/status/2043384259482902603">Short Demo</a>
 </p>
 
 ---
