@@ -157,6 +157,12 @@ if grep -q 'for item in "$BUILD_DIR"/\*' scripts/build-dmg.sh; then
 fi
 step "Tracked build assets are protected from broad cleanup"
 
+grep -q 'scripts/smoke-test.sh" --production' scripts/release-movingpaper.sh \
+    || fail "release-movingpaper.sh must run production smoke before publishing"
+grep -q "expected_dmg_bytes" scripts/release-movingpaper.sh \
+    || fail "release-movingpaper.sh must verify live appcast artifact length"
+step "Release workflow enforces production smoke and live appcast metadata checks"
+
 if [ -f ".codex/environments/environment.toml" ]; then
     run_command="$(awk -F' = ' '$1 == "command" { gsub(/"/, "", $2); print $2 }' .codex/environments/environment.toml)"
     [ -z "$run_command" ] || [ -x "$run_command" ] || fail "Codex Run action points at a missing executable: $run_command"

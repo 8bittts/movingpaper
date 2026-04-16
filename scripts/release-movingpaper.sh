@@ -17,6 +17,9 @@ step()  { printf "\033[1;36m  ->\033[0m %s\n" "$1"; }
 
 verify_live_appcast() {
     local expected_version="$1"
+    local expected_build="$2"
+    local expected_dmg_name="$3"
+    local expected_dmg_bytes="$4"
     local appcast_url="https://github.com/${GITHUB_REPO}/releases/latest/download/appcast.xml"
     local temp_appcast
     temp_appcast="$(mktemp "${TMPDIR:-/tmp}/movingpaper-live-appcast.XXXXXX.xml")"
@@ -26,11 +29,14 @@ verify_live_appcast() {
             -H "Cache-Control: no-cache" \
             "${appcast_url}?t=$(date +%s)" \
             -o "$temp_appcast"; then
-            if grep -q "<sparkle:shortVersionString>${expected_version}</sparkle:shortVersionString>" "$temp_appcast" \
-                && grep -q "sparkle-signatures:" "$temp_appcast" \
+            if grep -Fq -- "<sparkle:shortVersionString>${expected_version}</sparkle:shortVersionString>" "$temp_appcast" \
+                && grep -Fq -- "<sparkle:version>${expected_build}</sparkle:version>" "$temp_appcast" \
+                && grep -Fq -- "$expected_dmg_name" "$temp_appcast" \
+                && grep -Fq -- "length=\"${expected_dmg_bytes}\"" "$temp_appcast" \
+                && grep -Fq -- "sparkle-signatures:" "$temp_appcast" \
                 && tools/sparkle/bin/sign_update --verify "$temp_appcast" >/dev/null 2>&1; then
                 rm -f "$temp_appcast"
-                step "Verified live signed appcast"
+                step "Verified live signed appcast metadata"
                 return 0
             fi
         fi
@@ -108,10 +114,17 @@ MOVINGPAPER_BUILD="$NEXT_BUILD" \
 SPARKLE_NOTES_SINCE="$PREVIOUS_TAG" \
 "${REPO_ROOT}/scripts/build-dmg.sh"
 
+DMG_FILE="build/${APP_NAME}-${NEXT_VERSION}.dmg"
+SHA_FILE="build/${APP_NAME}-${NEXT_VERSION}.sha256"
+APPCAST_FILE="build/appcast.xml"
+
 plist_set "$PLIST_FILE" "CFBundleShortVersionString" string "$NEXT_VERSION"
 plist_set "$PLIST_FILE" "CFBundleVersion" string "$NEXT_BUILD"
 update_readme "$NEXT_VERSION"
 step "Updated release metadata"
+
+"${REPO_ROOT}/scripts/smoke-test.sh" --production
+step "Production smoke gate passed"
 
 git add "$PLIST_FILE" "$README_FILE"
 git commit -m "release: ${APP_NAME} v${NEXT_VERSION}"
@@ -124,13 +137,10 @@ git push origin HEAD
 git push origin "v${NEXT_VERSION}"
 step "Pushed commit and tag"
 
-DMG_FILE="build/${APP_NAME}-${NEXT_VERSION}.dmg"
-SHA_FILE="build/${APP_NAME}-${NEXT_VERSION}.sha256"
-APPCAST_FILE="build/appcast.xml"
-
 [ -f "$DMG_FILE" ] || fail "Missing release DMG at ${DMG_FILE}"
 [ -f "$SHA_FILE" ] || fail "Missing checksum at ${SHA_FILE}"
 [ -f "$APPCAST_FILE" ] || fail "Missing appcast at ${APPCAST_FILE}"
+DMG_BYTES="$(stat -f%z "$DMG_FILE")"
 
 RELEASE_NOTES="$(mktemp)"
 cleanup() {
@@ -169,7 +179,7 @@ done
 [ "$HTTP_CODE" = "200" ] || fail "Download URL returned HTTP ${HTTP_CODE} after 10 attempts: ${DOWNLOAD_URL}"
 step "Verified release download URL"
 
-verify_live_appcast "$NEXT_VERSION"
+verify_live_appcast "$NEXT_VERSION" "$NEXT_BUILD" "$(basename "$DMG_FILE")" "$DMG_BYTES"
 
 echo ""
 info "Release complete"
