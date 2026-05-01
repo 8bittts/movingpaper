@@ -12,7 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installApplicationIcon()
 
         // Menu bar only — no Dock icon, no Cmd+Tab entry
-        NSApp.setActivationPolicy(.accessory)
+        AppPresentation.returnToAccessory()
 
         let manager = WallpaperManager()
         self.wallpaperManager = manager

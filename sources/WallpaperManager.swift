@@ -3,30 +3,6 @@ import AVFoundation
 import Combine
 import SwiftUI
 
-/// How wallpapers are assigned.
-enum WallpaperMode: String {
-    case allDesktops   // one file across all screens and spaces
-    case perDesktop    // different file per screen + space (like native macOS)
-}
-
-/// Composite key for per-desktop wallpaper assignments.
-/// Combines physical display + macOS Space for unique identification.
-struct DesktopKey: Hashable {
-    let displayID: CGDirectDisplayID
-    let spaceID: UInt64
-
-    /// Key for "all desktops" mode — space is irrelevant.
-    init(displayID: CGDirectDisplayID) {
-        self.displayID = displayID
-        self.spaceID = 0
-    }
-
-    init(displayID: CGDirectDisplayID, spaceID: UInt64) {
-        self.displayID = displayID
-        self.spaceID = spaceID
-    }
-}
-
 /// Central coordinator: manages per-screen wallpaper windows, file selection,
 /// playback state, sound, space tracking, and power-aware pause/resume.
 @MainActor
@@ -67,6 +43,7 @@ final class WallpaperManager: ObservableObject {
     private let loadingOverlay = LoadingOverlayController()
     private var downloadOverlayObserver: AnyCancellable?
     private let requestCoordinator = WallpaperRequestCoordinator()
+    private let persistenceStore = WallpaperPersistenceStore()
     private var restoreTask: Task<Void, Never>?
     private var activeDownloadSource: ActiveDownloadSource?
     @Published private(set) var activeSpaceIDs: [CGDirectDisplayID: UInt64] = [:]
@@ -76,14 +53,6 @@ final class WallpaperManager: ObservableObject {
     private var youtubeURLs: [DesktopKey: String] = [:]
     /// Cached playback positions so videos resume where the user left off after space switches.
     private var playbackPositions: [DesktopKey: CMTime] = [:]
-
-    // MARK: - Persistence Keys
-
-    private enum Defaults {
-        static let desktopFiles = "desktopFiles"
-        static let mode = "wallpaperMode"
-        static let isMuted = "isMuted"
-    }
 
     init() {
         refreshManagedDisplaySpaces()
@@ -127,11 +96,7 @@ final class WallpaperManager: ObservableObject {
 
     /// Determine file type from URL extension.
     func fileType(for url: URL) -> WallpaperFileType? {
-        switch url.pathExtension.lowercased() {
-        case "gif":            return .gif
-        case "mov", "mp4", "m4v": return .video
-        default:               return nil
-        }
+        WallpaperFileType.detect(for: url)
     }
 
     /// All connected displays.
@@ -184,7 +149,7 @@ final class WallpaperManager: ObservableObject {
             activeDownloadSource = nil
         }
         loadingOverlay.hide()
-        NSApp.setActivationPolicy(.accessory)
+        AppPresentation.returnToAccessory()
     }
 
     private func cancelAllAssignments() {
@@ -194,25 +159,23 @@ final class WallpaperManager: ObservableObject {
             activeDownloadSource = nil
         }
         loadingOverlay.hide()
-        NSApp.setActivationPolicy(.accessory)
+        AppPresentation.returnToAccessory()
     }
 
     /// Open file picker and assign result.
     func selectFile(for displayID: CGDirectDisplayID? = nil) {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        defer { NSApp.setActivationPolicy(.accessory) }
+        AppPresentation.withForegroundActivation {
+            let panel = NSOpenPanel()
+            panel.allowedContentTypes = [
+                .gif, .mpeg4Movie, .quickTimeMovie, .movie,
+            ]
+            panel.allowsMultipleSelection = false
+            panel.canChooseDirectories = false
+            panel.message = "Choose a GIF or video file for your MovingPaper wallpaper"
 
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [
-            .gif, .mpeg4Movie, .quickTimeMovie, .movie,
-        ]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.message = "Choose a GIF or video file for your MovingPaper wallpaper"
-
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        setWallpaper(url: url, for: displayID)
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            setWallpaper(url: url, for: displayID)
+        }
     }
 
     /// Assign a wallpaper file. In perDesktop mode, `spaceID` pins to a specific
@@ -296,25 +259,14 @@ final class WallpaperManager: ObservableObject {
     }
 
     private func showAlert(title: String, message: String) {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        defer { NSApp.setActivationPolicy(.accessory) }
-
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "OK")
-        alert.window.level = .floating
-        alert.runModal()
+        AppPresentation.showWarningAlert(title: title, message: message)
     }
 
     // MARK: - Photos Shuffle
 
     /// Pick a random video from the entire Photos library and set it as wallpaper.
     func shuffleFromPhotos(for displayID: CGDirectDisplayID? = nil) {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
+        AppPresentation.promoteToForeground()
         let target = assignmentTarget(for: displayID)
         let originSpaceID = displayID.map { currentSpaceID(for: $0) } ?? 0
         cancelRestoreTask()
@@ -324,13 +276,13 @@ final class WallpaperManager: ObservableObject {
             guard let url = await photosService.randomVideoURL() else {
                 guard requestCoordinator.isCurrent(token, for: target) else { return }
                 loadingOverlay.hide()
-                NSApp.setActivationPolicy(.accessory)
+                AppPresentation.returnToAccessory()
                 showAlert(title: "No Videos Found", message: "Grant Photos access in System Settings or add videos to your library.")
                 return
             }
             guard requestCoordinator.isCurrent(token, for: target) else { return }
             loadingOverlay.hide()
-            NSApp.setActivationPolicy(.accessory)
+            AppPresentation.returnToAccessory()
             applyWallpaper(url: url, for: displayID, spaceID: originSpaceID)
         }
     }
@@ -449,76 +401,43 @@ final class WallpaperManager: ObservableObject {
     // MARK: - Persistence
 
     private func saveState() {
-        let encoded: [[String: Any]] = desktopFiles.map { (key, url) in
-            var entry: [String: Any] = [
-                "displayID": NSNumber(value: key.displayID),
-                "spaceID": NSNumber(value: key.spaceID),
-                "path": url.path(percentEncoded: false),
-            ]
-            if let ytURL = youtubeURLs[key] {
-                entry["youtubeURL"] = ytURL
-            }
-            return entry
-        }
-        UserDefaults.standard.set(encoded, forKey: Defaults.desktopFiles)
-        UserDefaults.standard.set(mode.rawValue, forKey: Defaults.mode)
-        UserDefaults.standard.set(isMuted, forKey: Defaults.isMuted)
+        persistenceStore.save(
+            mode: mode,
+            isMuted: isMuted,
+            desktopFiles: desktopFiles,
+            youtubeURLs: youtubeURLs
+        )
     }
 
     private func restoreState() {
-        if let raw = UserDefaults.standard.string(forKey: Defaults.mode),
-           let savedMode = WallpaperMode(rawValue: raw) {
-            mode = savedMode
-        }
-        isMuted = UserDefaults.standard.object(forKey: Defaults.isMuted) as? Bool ?? true
+        let state = persistenceStore.load()
+        mode = state.mode
+        isMuted = state.isMuted
+        desktopFiles = state.desktopFiles
+        youtubeURLs = state.youtubeURLs
 
-        guard let entries = UserDefaults.standard.array(forKey: Defaults.desktopFiles)
-                as? [[String: Any]] else { return }
-
-        var needsRedownload: [(DesktopKey, String)] = []
-
-        for entry in entries {
-            guard let displayIDNum = entry["displayID"] as? NSNumber,
-                  let spaceIDNum = entry["spaceID"] as? NSNumber,
-                  let path = entry["path"] as? String else { continue }
-            let key = DesktopKey(
-                displayID: displayIDNum.uint32Value,
-                spaceID: spaceIDNum.uint64Value
-            )
-
-            // Restore YouTube URL mapping
-            if let ytURL = entry["youtubeURL"] as? String {
-                youtubeURLs[key] = ytURL
-            }
-
-            // Track this space so it appears in the per-desktop menu
-            if key.spaceID != 0 {
-                knownSpaces[key.displayID, default: []].insert(key.spaceID)
-            }
-
-            if FileManager.default.fileExists(atPath: path) {
-                desktopFiles[key] = URL(filePath: path)
-            } else if let ytURL = entry["youtubeURL"] as? String {
-                // File missing but we have the YouTube URL — queue re-download
-                needsRedownload.append((key, ytURL))
-            }
+        for (displayID, spaces) in state.knownSpaces {
+            knownSpaces[displayID, default: []].formUnion(spaces)
         }
 
-        scheduleRestoreRedownloads(needsRedownload)
+        scheduleRestoreRedownloads(state.needsRedownload)
 
         if !desktopFiles.isEmpty {
             rebuildAllWindows()
         }
     }
 
-    private func scheduleRestoreRedownloads(_ items: [(DesktopKey, String)]) {
+    private func scheduleRestoreRedownloads(_ items: [WallpaperRedownloadRequest]) {
         guard !items.isEmpty else { return }
         cancelRestoreTask()
 
         restoreTask = Task { @MainActor [weak self] in
             guard let self else { return }
 
-            for (key, youtubeURL) in items {
+            for item in items {
+                let key = item.key
+                let youtubeURL = item.youtubeURL
+
                 guard !Task.isCancelled else { return }
                 guard desktopFiles[key] == nil, youtubeURLs[key] == youtubeURL else { continue }
 
@@ -766,18 +685,4 @@ final class WallpaperManager: ObservableObject {
         }
     }
 
-}
-
-// MARK: - Helpers
-
-enum WallpaperFileType {
-    case gif
-    case video
-}
-
-extension NSScreen {
-    /// Stable display ID for this screen.
-    var displayID: CGDirectDisplayID? {
-        deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
-    }
 }

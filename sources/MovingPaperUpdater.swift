@@ -137,13 +137,12 @@ extension MovingPaperUpdater: @preconcurrency SPUStandardUserDriverDelegate {
 
     func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool, forUpdate update: SUAppcastItem, state: SPUUserUpdateState) {
         guard handleShowingUpdate else { return }
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
+        AppPresentation.promoteToForeground()
         startFloatingWindows()
     }
 
     func standardUserDriverWillFinishUpdateSession() {
         stopFloatingWindows()
-        NSApp.setActivationPolicy(.accessory)
+        AppPresentation.returnToAccessory()
     }
 }

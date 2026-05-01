@@ -1,23 +1,18 @@
 import Testing
 import AppKit
 import Foundation
+@testable import MovingPaper
 
 /// Tests for wallpaper mode logic.
 struct WallpaperModeTests {
 
-    /// Mirrors the WallpaperMode enum from WallpaperManager
-    enum TestWallpaperMode: String {
-        case allDesktops
-        case perDesktop
-    }
-
     @Test func modeRawValues() {
-        #expect(TestWallpaperMode.allDesktops.rawValue == "allDesktops")
-        #expect(TestWallpaperMode.perDesktop.rawValue == "perDesktop")
+        #expect(WallpaperMode.allDesktops.rawValue == "allDesktops")
+        #expect(WallpaperMode.perDesktop.rawValue == "perDesktop")
     }
 
     @Test func modesAreDistinct() {
-        #expect(TestWallpaperMode.allDesktops != TestWallpaperMode.perDesktop)
+        #expect(WallpaperMode.allDesktops != WallpaperMode.perDesktop)
     }
 }
 

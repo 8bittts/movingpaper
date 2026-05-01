@@ -64,7 +64,7 @@ extension PhotosPickerController: NSWindowDelegate {
     nonisolated func windowWillClose(_ notification: Notification) {
         MainActor.assumeIsolated {
             Self.isShowing = false
-            NSApp.setActivationPolicy(.accessory)
+            AppPresentation.returnToAccessory()
             let cont = continuation
             continuation = nil
             cont?.resume(returning: nil)

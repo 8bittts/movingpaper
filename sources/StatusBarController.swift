@@ -358,42 +358,36 @@ final class StatusBarController {
     }
 
     private func promptForYouTubeURL() -> String? {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        defer { NSApp.setActivationPolicy(.accessory) }
+        AppPresentation.withForegroundActivation {
+            let alert = NSAlert()
+            alert.messageText = "Paste YouTube URL"
+            alert.informativeText = "Enter a YouTube video URL to use as your wallpaper."
+            alert.addButton(withTitle: "Start")
+            alert.addButton(withTitle: "Cancel")
 
-        let alert = NSAlert()
-        alert.messageText = "Paste YouTube URL"
-        alert.informativeText = "Enter a YouTube video URL to use as your wallpaper."
-        alert.addButton(withTitle: "Start")
-        alert.addButton(withTitle: "Cancel")
+            let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 380, height: 24))
+            input.placeholderString = "https://youtube.com/watch?v=..."
+            input.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+            input.lineBreakMode = .byTruncatingMiddle
+            input.usesSingleLineMode = true
+            if let clip = NSPasteboard.general.string(forType: .string) {
+                input.stringValue = clip
+            }
+            alert.accessoryView = input
+            alert.window.initialFirstResponder = input
 
-        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 380, height: 24))
-        input.placeholderString = "https://youtube.com/watch?v=..."
-        input.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-        input.lineBreakMode = .byTruncatingMiddle
-        input.usesSingleLineMode = true
-        // Pre-fill from clipboard
-        if let clip = NSPasteboard.general.string(forType: .string) {
-            input.stringValue = clip
+            guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+            let value = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value.isEmpty ? nil : value
         }
-        alert.accessoryView = input
-        alert.window.initialFirstResponder = input
-
-        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
-        let value = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        return value.isEmpty ? nil : value
     }
 
     @objc private func chooseFromPhotosForAll() {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
+        AppPresentation.promoteToForeground()
         Task {
+            defer { AppPresentation.returnToAccessory() }
             let picker = PhotosPickerController()
             let url = await picker.run()
-            // Reset activation policy regardless of result (picker sets it on success,
-            // but if isShowing guard fires, nobody resets it)
-            NSApp.setActivationPolicy(.accessory)
             guard let url else { return }
             wallpaperManager.setWallpaper(url: url)
         }
@@ -401,12 +395,11 @@ final class StatusBarController {
 
     @objc private func chooseFromPhotosForDisplay(_ sender: NSMenuItem) {
         let displayID = CGDirectDisplayID(sender.tag)
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
+        AppPresentation.promoteToForeground()
         Task {
+            defer { AppPresentation.returnToAccessory() }
             let picker = PhotosPickerController()
             let url = await picker.run()
-            NSApp.setActivationPolicy(.accessory)
             guard let url else { return }
             wallpaperManager.setWallpaper(url: url, for: displayID)
         }
