@@ -11,6 +11,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AppIdentityDefaultsMigration.migrateIfNeeded()
         installApplicationIcon()
 
+        // Evict stale cache entries off the main path; safe to drop if cancelled.
+        Task.detached(priority: .utility) {
+            CacheJanitor.enforceDefaultPolicies()
+        }
+
         // Menu bar only — no Dock icon, no Cmd+Tab entry
         AppPresentation.returnToAccessory()
 
