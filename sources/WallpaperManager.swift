@@ -335,7 +335,7 @@ final class WallpaperManager: ObservableObject {
         let persisted = persistenceStore.load()
         mode = persisted.mode
         isMuted = persisted.isMuted
-        state = persisted.state
+        state.adopt(persisted: persisted.state)
 
         scheduleRestoreRedownloads(persisted.needsRedownload)
 

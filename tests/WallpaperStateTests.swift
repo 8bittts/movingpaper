@@ -71,6 +71,27 @@ struct WallpaperStateTests {
         #expect(state.entries.isEmpty)
     }
 
+    @Test func adoptPreservesLiveKnownSpacesAcrossPersistedRestore() {
+        // Simulate `refreshManagedDisplaySpaces()` populating fresh Spaces…
+        var state = WallpaperState()
+        state.knownSpaces[displayA] = Set([7, 8, 9])
+
+        // …then `restoreState()` loading older persistence with different
+        // Spaces and assignments. The fresh Spaces must survive the adopt so
+        // the Per Desktop menu still shows desktops the user can switch to.
+        var persisted = WallpaperState()
+        persisted.entries[DesktopKey(displayID: displayA, spaceID: 7)] =
+            WallpaperEntry(localURL: localURL, youtubeOrigin: nil)
+        persisted.knownSpaces[displayA] = Set([7])
+        persisted.knownSpaces[displayB] = Set([42])
+
+        state.adopt(persisted: persisted)
+
+        #expect(state.entries[DesktopKey(displayID: displayA, spaceID: 7)] != nil)
+        #expect(state.knownSpaces[displayA] == Set([7, 8, 9]))
+        #expect(state.knownSpaces[displayB] == Set([42]))
+    }
+
     @Test func migrateToPerDesktopRekeysExistingAssignmentsToTheActiveSpace() {
         var state = WallpaperState()
         let entry = WallpaperEntry(localURL: localURL, youtubeOrigin: nil)

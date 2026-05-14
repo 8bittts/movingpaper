@@ -45,6 +45,19 @@ struct WallpaperState: Equatable {
         }
     }
 
+    /// Replace this state's entries and playback positions with `persisted`'s,
+    /// but keep every Space we already saw from the live system snapshot.
+    /// Used after `refreshManagedDisplaySpaces()` so loading persistence does
+    /// not erase Spaces the user can currently switch to — those would never
+    /// appear in the Per Desktop menu otherwise.
+    mutating func adopt(persisted: WallpaperState) {
+        let liveKnownSpaces = knownSpaces
+        self = persisted
+        for (displayID, spaces) in liveKnownSpaces {
+            knownSpaces[displayID, default: []].formUnion(spaces)
+        }
+    }
+
     /// Drop assignments for displays not in `connectedDisplayIDs` and pin the
     /// shared value (if any) to every connected display. Mirrors
     /// `AllDesktopAssignmentReconciler` but operates on full entries.
