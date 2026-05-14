@@ -8,11 +8,6 @@ import SwiftUI
 @MainActor
 final class WallpaperManager: ObservableObject {
 
-    private enum ActiveDownloadSource: Equatable {
-        case assignment(WallpaperAssignmentTarget)
-        case restore
-    }
-
     // MARK: - Published State
 
     /// All per-desktop wallpaper assignments, playback positions, and observed Spaces.
@@ -45,7 +40,6 @@ final class WallpaperManager: ObservableObject {
     private let requestCoordinator = WallpaperRequestCoordinator()
     private let persistenceStore = WallpaperPersistenceStore()
     private var restoreTask: Task<Void, Never>?
-    private var activeDownloadSource: ActiveDownloadSource?
     @Published private(set) var activeSpaceIDs: [CGDirectDisplayID: UInt64] = [:]
 
     init() {
@@ -120,31 +114,22 @@ final class WallpaperManager: ObservableObject {
         return .allDesktops
     }
 
+    /// Cancelling the restore Task propagates through `withTaskCancellationHandler`
+    /// in `YouTubeDownloader.runYTDLP`, which terminates the subprocess. No
+    /// separate downloader-cancel bookkeeping needed.
     private func cancelRestoreTask() {
         restoreTask?.cancel()
         restoreTask = nil
-        if activeDownloadSource == .restore {
-            youtubeDownloader.cancel()
-            activeDownloadSource = nil
-        }
     }
 
     private func cancelAssignment(for target: WallpaperAssignmentTarget) {
         requestCoordinator.cancel(target)
-        if activeDownloadSource == .assignment(target) {
-            youtubeDownloader.cancel()
-            activeDownloadSource = nil
-        }
         loadingOverlay.hide()
         AppPresentation.returnToAccessory()
     }
 
     private func cancelAllAssignments() {
         requestCoordinator.cancelAll()
-        if case .assignment = activeDownloadSource {
-            youtubeDownloader.cancel()
-            activeDownloadSource = nil
-        }
         loadingOverlay.hide()
         AppPresentation.returnToAccessory()
     }
@@ -209,12 +194,6 @@ final class WallpaperManager: ObservableObject {
         cancelRestoreTask()
         requestCoordinator.start(for: target) { [weak self] token in
             guard let self else { return }
-            activeDownloadSource = .assignment(target)
-            defer {
-                if activeDownloadSource == .assignment(target) {
-                    activeDownloadSource = nil
-                }
-            }
             guard let localURL = await youtubeDownloader.download(youtubeURL: urlString) else {
                 guard requestCoordinator.isCurrent(token, for: target) else { return }
                 if case .failed(let msg) = youtubeDownloader.state {
@@ -378,19 +357,11 @@ final class WallpaperManager: ObservableObject {
                 let youtubeURL = item.youtubeURL
 
                 guard !Task.isCancelled else { return }
-                // Skip if the user has filled this slot in the meantime.
                 guard state.entries[key] == nil else { continue }
 
-                activeDownloadSource = .restore
                 guard let localURL = await youtubeDownloader.download(youtubeURL: youtubeURL) else {
-                    if activeDownloadSource == .restore {
-                        activeDownloadSource = nil
-                    }
                     guard !Task.isCancelled else { return }
                     continue
-                }
-                if activeDownloadSource == .restore {
-                    activeDownloadSource = nil
                 }
 
                 guard !Task.isCancelled else { return }
@@ -404,9 +375,6 @@ final class WallpaperManager: ObservableObject {
                 rebuildAllWindows()
             }
 
-            if activeDownloadSource == .restore {
-                activeDownloadSource = nil
-            }
             restoreTask = nil
         }
     }

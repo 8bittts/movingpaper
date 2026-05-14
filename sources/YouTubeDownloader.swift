@@ -194,6 +194,14 @@ final class YouTubeDownloader: ObservableObject {
     }
 
     private func runYTDLP(binary: String, downloadID: UUID, arguments: [String]) async -> DownloadResult {
+        await withTaskCancellationHandler {
+            await runYTDLPSubprocess(binary: binary, downloadID: downloadID, arguments: arguments)
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.cancel() }
+        }
+    }
+
+    private func runYTDLPSubprocess(binary: String, downloadID: UUID, arguments: [String]) async -> DownloadResult {
         await withCheckedContinuation { continuation in
             let proc = Process()
             proc.executableURL = URL(filePath: binary)
