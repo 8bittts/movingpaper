@@ -1,0 +1,22 @@
+# Periphery config for MovingPaper (Swift Package, single executable target).
+# Usage:
+#   brew install peripheryapp/periphery/periphery
+#   periphery scan
+#
+# Notes:
+# - retain_public: anything public is an API surface, even if not referenced
+#   inside this package — keep it.
+# - retain_objc_accessible: @objc declarations are commonly called via
+#   selector(...) which Periphery can't always follow, so don't flag them.
+# - retain_unused_protocol_func_params: AppKit/Sparkle protocol methods
+#   intentionally ignore some parameters; keep them named.
+project: .
+schemes:
+  - MovingPaper
+targets:
+  - MovingPaper
+retain_public: true
+retain_objc_accessible: true
+retain_unused_protocol_func_params: true
+report_exclude:
+  - sources/Resources/**
