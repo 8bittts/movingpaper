@@ -1,7 +1,6 @@
 import AppKit
 import AVFoundation
 import Combine
-import SwiftUI
 
 /// Central coordinator: manages per-screen wallpaper windows, file selection,
 /// playback state, sound, space tracking, and power-aware pause/resume.

@@ -22,11 +22,9 @@ struct WallpaperState: Equatable {
     var isEmpty: Bool { entries.isEmpty }
 
     func localURL(for key: DesktopKey) -> URL? { entries[key]?.localURL }
-    func youtubeOrigin(for key: DesktopKey) -> String? { entries[key]?.youtubeOrigin }
 
     /// The single shared URL when all desktops share one wallpaper, or `nil`.
     var sharedLocalURL: URL? { entries.values.first?.localURL }
-    var sharedYouTubeOrigin: String? { entries.values.first?.youtubeOrigin }
 
     mutating func setEntry(_ entry: WallpaperEntry, for key: DesktopKey) {
         entries[key] = entry
@@ -36,10 +34,6 @@ struct WallpaperState: Equatable {
     mutating func clearEntry(for key: DesktopKey) {
         entries.removeValue(forKey: key)
         playbackPositions.removeValue(forKey: key)
-    }
-
-    mutating func recordVisitedSpace(displayID: CGDirectDisplayID, spaceID: UInt64) {
-        knownSpaces[displayID, default: []].insert(spaceID)
     }
 
     /// Replace all assignments with a single shared entry across the given displays.

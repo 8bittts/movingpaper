@@ -143,7 +143,7 @@ A borderless `NSPanel` at `desktopWindow + 1` sits above the system wallpaper bu
 |---|---|
 | Build | Swift Package Manager |
 | Windowing | AppKit (`NSPanel`, `NSStatusItem`) |
-| UI | SwiftUI via `NSHostingView` |
+| UI | AppKit wallpaper views; SwiftUI only for the app lifecycle and loading overlay |
 | Video | AVFoundation (`AVQueuePlayer`, `AVPlayerLooper`) |
 | Photos | PhotosUI (`PHPickerViewController`) + PhotoKit (shuffle) |
 | GIF | ImageIO (`CGAnimateImageAtURLWithBlock`) |

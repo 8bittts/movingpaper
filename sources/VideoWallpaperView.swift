@@ -10,7 +10,6 @@ final class VideoPlayerNSView: NSView {
     private(set) var player: AVQueuePlayer?
     private var looper: AVPlayerLooper?
     private var playerLayer: AVPlayerLayer?
-    private(set) var currentURL: URL?
     private var statusObserver: AnyCancellable?
 
     override init(frame: NSRect) {
@@ -34,8 +33,6 @@ final class VideoPlayerNSView: NSView {
         looper = nil
         player = nil
         playerLayer?.removeFromSuperlayer()
-
-        currentURL = url
 
         let asset = AVURLAsset(url: url)
         let item = AVPlayerItem(asset: asset)

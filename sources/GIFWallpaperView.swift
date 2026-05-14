@@ -7,7 +7,6 @@ import ImageIO
 final class GIFAnimationNSView: NSView {
     private var imageLayer: CALayer?
     private var stopped = false
-    private(set) var currentURL: URL?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -33,7 +32,6 @@ final class GIFAnimationNSView: NSView {
     func loadGIF(url: URL) {
         stopAnimation()
         stopped = false
-        currentURL = url
 
         _ = CGAnimateImageAtURLWithBlock(
             url as CFURL,
@@ -56,7 +54,6 @@ final class GIFAnimationNSView: NSView {
     func stopAnimation() {
         stopped = true
         imageLayer?.contents = nil
-        currentURL = nil
     }
 
     override func removeFromSuperview() {
