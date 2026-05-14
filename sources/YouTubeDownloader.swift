@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import CryptoKit
 import Foundation
 
 private extension Array where Element: Hashable {
@@ -51,7 +52,15 @@ final class YouTubeDownloader: ObservableObject {
         return nil
     }
 
+    /// Pinned yt-dlp release. Bump both fields together — the SHA-256 is checked
+    /// against the downloaded binary before it's installed and made executable.
+    /// Refresh via `curl -fsSL https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest`
+    /// when YouTube site changes break the current pinned version.
+    nonisolated static let pinnedYTDLPVersion = "2026.03.17"
+    nonisolated static let pinnedYTDLPSHA256 = "e80c47b3ce712acee51d5e3d4eace2d181b44d38f1942c3a32e3c7ff53cd9ed5"
+
     /// Download yt-dlp if not already installed. Returns path on success.
+    /// Verifies the downloaded binary against the pinned SHA-256 before installing.
     static func ensureYTDLP() async -> String? {
         if let existing = ytdlpPath { return existing }
 
@@ -59,20 +68,31 @@ final class YouTubeDownloader: ObservableObject {
         let dir = installURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
-        // Download from GitHub releases
-        let downloadURL = URL(string: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos")!
+        let downloadURL = URL(string:
+            "https://github.com/yt-dlp/yt-dlp/releases/download/\(pinnedYTDLPVersion)/yt-dlp_macos"
+        )!
         do {
             let (data, response) = try await URLSession.shared.data(from: downloadURL)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
                 return nil
             }
+            guard sha256Hex(of: data) == pinnedYTDLPSHA256 else {
+                // Refuse to install a binary that doesn't match the pinned hash.
+                return nil
+            }
             try data.write(to: installURL)
-            // Make executable
-            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: installURL.path(percentEncoded: false))
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o755],
+                ofItemAtPath: installURL.path(percentEncoded: false)
+            )
             return installURL.path(percentEncoded: false)
         } catch {
             return nil
         }
+    }
+
+    nonisolated static func sha256Hex(of data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     // MARK: - Download
