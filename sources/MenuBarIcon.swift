@@ -5,27 +5,40 @@ import AppKit
 @MainActor
 enum MenuBarIcon {
     static let pointSize = NSSize(width: 22, height: 22)
+    /// macOS "squircle" corner ratio used by Big Sur+ app icons. Gives the
+    /// menu bar item the same rounded shape as native app icons (e.g. DockishOS).
+    private static let cornerRadiusRatio: CGFloat = 0.22
 
     private static let cachedImage: NSImage? = Bundle.module
         .url(forResource: "movingpaper-icon", withExtension: "png", subdirectory: "Resources")
         .flatMap(NSImage.init(contentsOf:))
 
-    /// Pre-rounded brand image sized for the status bar item.
+    /// Brand image sized for the status bar, with a rounded-rect clip applied so
+    /// corner rounding matches macOS app icons regardless of the source PNG.
     static func brandIcon() -> NSImage {
-        if let cached = cachedImage {
-            let copy = cached.copy() as? NSImage ?? cached
-            copy.size = pointSize
-            copy.isTemplate = false
-            return copy
-        }
-
-        let fallback = NSImage(systemSymbolName: "cloud.moon.fill", accessibilityDescription: "MovingPaper") ?? NSImage()
-        fallback.size = pointSize
-        return fallback
+        guard let source = cachedImage else { return fallbackIcon() }
+        return roundedImage(source: source, size: pointSize, radiusRatio: cornerRadiusRatio)
     }
 
     /// Full-resolution brand image suitable for `NSApp.applicationIconImage`.
     static func applicationIcon() -> NSImage? {
         cachedImage.flatMap { $0.copy() as? NSImage }
+    }
+
+    private static func roundedImage(source: NSImage, size: NSSize, radiusRatio: CGFloat) -> NSImage {
+        let image = NSImage(size: size, flipped: false) { rect in
+            let radius = min(rect.width, rect.height) * radiusRatio
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).addClip()
+            source.draw(in: rect)
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }
+
+    private static func fallbackIcon() -> NSImage {
+        let fallback = NSImage(systemSymbolName: "cloud.moon.fill", accessibilityDescription: "MovingPaper") ?? NSImage()
+        fallback.size = pointSize
+        return fallback
     }
 }
