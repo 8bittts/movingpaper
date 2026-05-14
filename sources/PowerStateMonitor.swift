@@ -50,6 +50,7 @@ final class PowerStateMonitor {
         let verdict = Self.shouldPause(processInfo: .processInfo)
         guard verdict != lastVerdict else { return }
         lastVerdict = verdict
+        Log.power.info("Power verdict changed: shouldPause=\(verdict, privacy: .public)")
         onChange(verdict)
     }
 

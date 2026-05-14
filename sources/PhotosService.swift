@@ -15,18 +15,25 @@ final class PhotosService: Sendable {
     /// Fetch a random video URL from the entire Photos library.
     /// Tries up to 3 random assets if export fails (iCloud-only, corrupted, etc.).
     func randomVideoURL() async -> URL? {
-        guard await requestAccess() else { return nil }
+        guard await requestAccess() else {
+            Log.photos.notice("Photos access denied; cannot shuffle")
+            return nil
+        }
 
         let options = PHFetchOptions()
         options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.video.rawValue)
         let allVideos = PHAsset.fetchAssets(with: options)
-        guard allVideos.count > 0 else { return nil }
+        guard allVideos.count > 0 else {
+            Log.photos.notice("No videos found in Photos library")
+            return nil
+        }
 
-        for _ in 0..<3 {
+        for attempt in 0..<3 {
             let index = Int.random(in: 0..<allVideos.count)
             if let url = await exportVideo(asset: allVideos.object(at: index)) {
                 return url
             }
+            Log.photos.notice("Shuffle export attempt \(attempt + 1, privacy: .public)/3 failed")
         }
         return nil
     }

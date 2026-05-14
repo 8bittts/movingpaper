@@ -77,7 +77,7 @@ final class YouTubeDownloader: ObservableObject {
                 return nil
             }
             guard sha256Hex(of: data) == pinnedYTDLPSHA256 else {
-                // Refuse to install a binary that doesn't match the pinned hash.
+                Log.youtube.error("yt-dlp SHA-256 mismatch for pinned version \(pinnedYTDLPVersion, privacy: .public); refusing to install")
                 return nil
             }
             try data.write(to: installURL)

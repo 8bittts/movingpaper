@@ -126,7 +126,9 @@ extension MovingPaperUpdater: SPUUpdaterDelegate {
     }
 
     func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {
-        status = .error(message: (error as NSError).localizedDescription)
+        let message = (error as NSError).localizedDescription
+        Log.updater.error("Sparkle aborted: \(message, privacy: .public)")
+        status = .error(message: message)
     }
 }
 
