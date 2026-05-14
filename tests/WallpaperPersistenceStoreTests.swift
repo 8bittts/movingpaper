@@ -80,6 +80,18 @@ struct WallpaperPersistenceStoreTests {
         #expect(loaded.needsRedownload.isEmpty)
     }
 
+    @Test func loadStampsTheCurrentSchemaVersion() throws {
+        let defaults = try temporaryDefaults()
+        defer { defaults.cleanup() }
+
+        #expect(defaults.userDefaults.integer(forKey: "persistenceSchemaVersion") == 0)
+        _ = WallpaperPersistenceStore(userDefaults: defaults.userDefaults).load()
+        #expect(
+            defaults.userDefaults.integer(forKey: "persistenceSchemaVersion")
+                == WallpaperPersistenceStore.currentSchemaVersion
+        )
+    }
+
     private func temporaryDefaults() throws -> TemporaryDefaults {
         let suiteName = "MovingPaperTests.\(UUID().uuidString)"
         guard let userDefaults = UserDefaults(suiteName: suiteName) else {

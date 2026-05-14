@@ -25,7 +25,12 @@ struct WallpaperPersistenceStore {
         static let desktopFiles = "desktopFiles"
         static let mode = "wallpaperMode"
         static let isMuted = "isMuted"
+        static let schemaVersion = "persistenceSchemaVersion"
     }
+
+    /// Bump this when the on-disk schema for any of the persisted keys changes,
+    /// and add a migration step in `runMigrationsIfNeeded`.
+    static let currentSchemaVersion = 1
 
     private let userDefaults: UserDefaults
     private let fileExists: (String) -> Bool
@@ -36,6 +41,20 @@ struct WallpaperPersistenceStore {
     ) {
         self.userDefaults = userDefaults
         self.fileExists = fileExists
+    }
+
+    /// Runs any pending schema migrations and stamps the current version. Safe
+    /// to call repeatedly; older versions become newer in place.
+    private func runMigrationsIfNeeded() {
+        // `integer(forKey:)` returns 0 when the key is absent, which is exactly
+        // what we want for pre-versioned defaults — those store the v1 shape.
+        let saved = userDefaults.integer(forKey: Defaults.schemaVersion)
+        guard saved < Self.currentSchemaVersion else { return }
+
+        // Future migrations slot in here, ordered from low version to high.
+        // e.g. `if saved < 2 { migrateToV2() }`
+
+        userDefaults.set(Self.currentSchemaVersion, forKey: Defaults.schemaVersion)
     }
 
     func save(mode: WallpaperMode, isMuted: Bool, state: WallpaperState) {
@@ -57,6 +76,7 @@ struct WallpaperPersistenceStore {
     }
 
     func load() -> WallpaperPersistedState {
+        runMigrationsIfNeeded()
         var persisted = WallpaperPersistedState.empty
 
         if let raw = userDefaults.string(forKey: Defaults.mode),
