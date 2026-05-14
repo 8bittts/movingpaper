@@ -6,6 +6,36 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>MovingPaper</title>
         <item>
+            <title>0.035</title>
+            <pubDate>Wed, 13 May 2026 18:46:53 -0700</pubDate>
+            <sparkle:version>60</sparkle:version>
+            <sparkle:shortVersionString>0.035</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description><![CDATA[<style>
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        padding: 16px 20px;
+        line-height: 1.6;
+        color: #1d1d1f;
+    }
+    h2 { font-size: 17px; font-weight: 600; margin: 0 0 14px 0; }
+    ul { padding-left: 20px; margin: 0; }
+    li { margin-bottom: 6px; font-size: 13px; }
+    .footer { margin-top: 16px; font-size: 11px; color: #86868b; }
+    @media (prefers-color-scheme: dark) {
+        body { color: #f5f5f7; }
+        .footer { color: #a1a1a6; }
+    }
+</style>
+<h2>What's New</h2>
+<ul>
+    <li>Round menu bar icon with macOS app-icon squircle (22%) like DockishOS</li></ul>
+<p class="footer">MovingPaper 0.035 -- your desktop, alive.</p>
+]]></description>
+            <enclosure url="https://github.com/8bittts/movingpaper/releases/download/v0.035/MovingPaper-0.035.dmg" length="2768079" type="application/octet-stream" sparkle:edSignature="ERSeXbfPnm7Wa2QBodje5ZJ1Ah5Mi5+Cp7Rlkmv/+7VPetqBapnwOy4gxurQ7VUMTgJTAOvBs/bjGgPt5Cj+Bw=="/>
+        </item>
+        <item>
             <title>0.034</title>
             <pubDate>Wed, 13 May 2026 18:39:05 -0700</pubDate>
             <sparkle:version>59</sparkle:version>
@@ -71,44 +101,9 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
 ]]></description>
             <enclosure url="https://github.com/8bittts/movingpaper/releases/download/v0.033/MovingPaper-0.033.dmg" length="2756904" type="application/octet-stream" sparkle:edSignature="4cENyQY5KRSfikz6PFwvuceiN1J45VyyffvNH9NYAXT/L3fScrFmcH1n46ric4hKq5F0ayGLXgs3FXpc3bZiCg=="/>
         </item>
-        <item>
-            <title>0.032</title>
-            <pubDate>Thu, 16 Apr 2026 14:15:52 -0700</pubDate>
-            <sparkle:version>57</sparkle:version>
-            <sparkle:shortVersionString>0.032</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description><![CDATA[<style>
-    body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        padding: 16px 20px;
-        line-height: 1.6;
-        color: #1d1d1f;
-    }
-    h2 { font-size: 17px; font-weight: 600; margin: 0 0 14px 0; }
-    ul { padding-left: 20px; margin: 0; }
-    li { margin-bottom: 6px; font-size: 13px; }
-    .footer { margin-top: 16px; font-size: 11px; color: #86868b; }
-    @media (prefers-color-scheme: dark) {
-        body { color: #f5f5f7; }
-        .footer { color: #a1a1a6; }
-    }
-</style>
-<h2>What's New</h2>
-<ul>
-    <li>Gate releases on production smoke</li>
-    <li>Tighten production smoke evidence</li>
-    <li>Harden smoke checks and YouTube URL parsing</li>
-    <li>More tests.</li>
-    <li>More tests.</li>
-    <li>Track build/ assets; ignore only release outputs</li></ul>
-<p class="footer">MovingPaper 0.032 -- your desktop, alive.</p>
-]]></description>
-            <enclosure url="https://github.com/8bittts/movingpaper/releases/download/v0.032/MovingPaper-0.032.dmg" length="2754648" type="application/octet-stream" sparkle:edSignature="13RAhKGPZGBasn0MMu7lzNP6b1lXI+Xri4MxkBz+k519nZ0CoEtFqpzJ0seuzbb0ABR+AFfNIK6Hd6GgHirIDw=="/>
-        </item>
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: N/ABW7RDP/IwBaRoiM8eOovAXqsSDTypvyGTpUhPBC3gxfY1JIAIJoTA1f3R8sP4lDMCwTHtpwoukf0VzoAlDg==
-length: 5377
+edSignature: 8jZLMioJ10X+zMO4Rg2LfPZB91mGQEbJ8Mu/nebZ/xg91+WQmXQ2l9i48jzPHKamU4MxJJcglLYLbn/M9JwQAg==
+length: 5197
 -->
