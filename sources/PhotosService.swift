@@ -1,11 +1,11 @@
-@preconcurrency import AVFoundation
-@preconcurrency import Photos
+import AVFoundation
+import Photos
 
 /// Fetches random videos from the Photos library for shuffle mode.
-@MainActor
-final class PhotosService: @unchecked Sendable {
+/// Stateless — every method is independently callable from any isolation.
+final class PhotosService: Sendable {
 
-    nonisolated func requestAccess() async -> Bool {
+    func requestAccess() async -> Bool {
         let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         if status == .authorized || status == .limited { return true }
         let newStatus = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
@@ -14,7 +14,7 @@ final class PhotosService: @unchecked Sendable {
 
     /// Fetch a random video URL from the entire Photos library.
     /// Tries up to 3 random assets if export fails (iCloud-only, corrupted, etc.).
-    nonisolated func randomVideoURL() async -> URL? {
+    func randomVideoURL() async -> URL? {
         guard await requestAccess() else { return nil }
 
         let options = PHFetchOptions()
@@ -31,7 +31,7 @@ final class PhotosService: @unchecked Sendable {
         return nil
     }
 
-    nonisolated private func exportVideo(asset: PHAsset) async -> URL? {
+    private func exportVideo(asset: PHAsset) async -> URL? {
         let cacheDir = AppPaths.photosShuffleCache
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
 
@@ -65,7 +65,7 @@ final class PhotosService: @unchecked Sendable {
         return nil
     }
 
-    nonisolated private func requestExportSession(for asset: PHAsset) async -> AVAssetExportSession? {
+    private func requestExportSession(for asset: PHAsset) async -> AVAssetExportSession? {
         nonisolated(unsafe) var requestID: PHImageRequestID = PHInvalidImageRequestID
         nonisolated(unsafe) var exportSession: AVAssetExportSession?
 
@@ -93,7 +93,7 @@ final class PhotosService: @unchecked Sendable {
         return exportSession
     }
 
-    nonisolated private func export(session: AVAssetExportSession, to destURL: URL) async -> Bool {
+    private func export(session: AVAssetExportSession, to destURL: URL) async -> Bool {
         nonisolated(unsafe) let session = session
         return await withTaskCancellationHandler(operation: {
             do {
