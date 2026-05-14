@@ -1,6 +1,6 @@
 cask "movingpaper" do
-  version "0.035"
-  sha256 "3aa6ea4755c4f08a47c5ec5b686ba36c6d068a65636d29f97985ee730b2d2e2d"
+  version "0.036"
+  sha256 "c231b305da0afb8c9c04f6133e7376eeb1b189fb60016cca97b504ada59ef7b5"
 
   url "https://github.com/8bittts/movingpaper/releases/download/v#{version}/MovingPaper-#{version}.dmg",
       verified: "github.com/8bittts/movingpaper/"
