@@ -1,18 +1,19 @@
 import AppKit
-import Combine
 
-/// Menu bar status item with wallpaper controls.
-/// Adapts menu structure based on wallpaper mode (all displays vs per display).
+/// Menu bar status item with wallpaper controls. Rebuilds its menu on demand
+/// (via NSMenuDelegate.menuNeedsUpdate) so per-state-change Combine pipelines
+/// don't throw NSMenuItems away dozens of times per second during typing or
+/// download-progress updates.
 @MainActor
-final class StatusBarController {
+final class StatusBarController: NSObject {
     private var statusItem: NSStatusItem?
     private let wallpaperManager: WallpaperManager
     private let updater: MovingPaperUpdater
-    private var cancellables = Set<AnyCancellable>()
 
     init(wallpaperManager: WallpaperManager, updater: MovingPaperUpdater) {
         self.wallpaperManager = wallpaperManager
         self.updater = updater
+        super.init()
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = item.button {
@@ -20,27 +21,14 @@ final class StatusBarController {
             icon.accessibilityDescription = "MovingPaper"
             button.image = icon
         }
+        let menu = NSMenu()
+        menu.delegate = self
+        item.menu = menu
         self.statusItem = item
-
-        rebuildMenu()
-
-        // Rebuild menu when any relevant state changes (debounced, skip initial emissions)
-        Publishers.MergeMany(
-            wallpaperManager.$state.dropFirst().map { _ in () }.eraseToAnyPublisher(),
-            wallpaperManager.$isPaused.dropFirst().map { _ in () }.eraseToAnyPublisher(),
-            wallpaperManager.$isMuted.dropFirst().map { _ in () }.eraseToAnyPublisher(),
-            wallpaperManager.$mode.dropFirst().map { _ in () }.eraseToAnyPublisher(),
-            wallpaperManager.$activeSpaceIDs.dropFirst().map { _ in () }.eraseToAnyPublisher(),
-            wallpaperManager.youtubeDownloader.$state.dropFirst().map { _ in () }.eraseToAnyPublisher(),
-            updater.$canCheckForUpdates.dropFirst().map { _ in () }.eraseToAnyPublisher()
-        )
-        .debounce(for: .milliseconds(50), scheduler: RunLoop.main)
-        .sink { [weak self] in self?.rebuildMenu() }
-        .store(in: &cancellables)
     }
 
-    private func rebuildMenu() {
-        let menu = NSMenu()
+    private func rebuildMenu(into menu: NSMenu) {
+        menu.removeAllItems()
 
         // Show download progress if active
         if case .downloading(let progress) = wallpaperManager.youtubeDownloader.state {
@@ -154,8 +142,6 @@ final class StatusBarController {
         )
         quitItem.target = self
         menu.addItem(quitItem)
-
-        statusItem?.menu = menu
     }
 
     // MARK: - All Displays Mode Menu
@@ -424,5 +410,13 @@ final class StatusBarController {
 
     @objc private func quit() {
         NSApp.terminate(nil)
+    }
+}
+
+// MARK: - NSMenuDelegate
+
+extension StatusBarController: NSMenuDelegate {
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        rebuildMenu(into: menu)
     }
 }
