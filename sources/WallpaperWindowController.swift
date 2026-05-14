@@ -1,9 +1,8 @@
 import AppKit
 import AVFoundation
-import SwiftUI
 
 /// Manages a single WallpaperPanel for one screen.
-/// Hosts either a video or GIF wallpaper view as its content.
+/// Hosts an AppKit content view (video or GIF) directly — no SwiftUI bridge.
 @MainActor
 final class WallpaperWindowController {
     let panel: WallpaperPanel
@@ -11,23 +10,23 @@ final class WallpaperWindowController {
     private(set) var currentURL: URL?
     /// Direct reference to the video player for position save/restore and mute.
     var player: AVQueuePlayer?
-    private var hostingView: NSHostingView<AnyView>?
+    private var contentView: NSView?
 
     init(screen: NSScreen) {
         self.screen = screen
         self.panel = WallpaperPanel(screen: screen)
     }
 
-    func show(content: some View, url: URL) {
+    /// Install an AppKit view as the wallpaper content for this panel.
+    func show(_ view: NSView, url: URL) {
         self.currentURL = url
 
-        let hosting = NSHostingView(rootView: AnyView(content))
-        hosting.frame = panel.contentView?.bounds ?? screen.frame
-        hosting.autoresizingMask = [.width, .height]
+        view.frame = panel.contentView?.bounds ?? screen.frame
+        view.autoresizingMask = [.width, .height]
 
         panel.contentView?.subviews.forEach { $0.removeFromSuperview() }
-        panel.contentView?.addSubview(hosting)
-        self.hostingView = hosting
+        panel.contentView?.addSubview(view)
+        self.contentView = view
 
         panel.orderFront(nil)
     }
@@ -38,8 +37,8 @@ final class WallpaperWindowController {
     }
 
     func close() {
-        hostingView?.removeFromSuperview()
-        hostingView = nil
+        contentView?.removeFromSuperview()
+        contentView = nil
         panel.orderOut(nil)
         panel.close()
     }

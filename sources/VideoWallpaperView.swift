@@ -1,31 +1,11 @@
 import AVFoundation
+import AppKit
 import Combine
-import SwiftUI
+import CoreMedia
 
-/// Seamlessly looping video wallpaper using AVQueuePlayer + AVPlayerLooper.
-/// Supports .mov, .mp4, .m4v formats including HEVC with alpha.
-struct VideoWallpaperView: NSViewRepresentable {
-    let url: URL
-    var isMuted: Bool = true
-    /// If set, the player seeks here once the first item is ready to play.
-    var resumeTime: CMTime?
-
-    func makeNSView(context: Context) -> VideoPlayerNSView {
-        let view = VideoPlayerNSView()
-        view.loadVideo(url: url, resumeTime: resumeTime)
-        view.setMuted(isMuted)
-        return view
-    }
-
-    func updateNSView(_ nsView: VideoPlayerNSView, context: Context) {
-        if nsView.currentURL != url {
-            nsView.loadVideo(url: url, resumeTime: resumeTime)
-        }
-        nsView.setMuted(isMuted)
-    }
-}
-
-/// AppKit view hosting an AVPlayerLayer for hardware-accelerated video rendering.
+/// AppKit view hosting an `AVPlayerLayer` for hardware-accelerated, seamlessly
+/// looping video wallpapers via `AVQueuePlayer` + `AVPlayerLooper`. Supports
+/// `.mov`, `.mp4`, `.m4v` including HEVC with alpha.
 final class VideoPlayerNSView: NSView {
     private(set) var player: AVQueuePlayer?
     private var looper: AVPlayerLooper?

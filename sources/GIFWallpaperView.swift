@@ -1,26 +1,9 @@
 import AppKit
 import ImageIO
-import SwiftUI
 
-/// Animated GIF wallpaper using CGAnimateImageAtURLWithBlock (macOS 10.15+).
-/// The system handles frame timing from the GIF's delay metadata automatically.
-struct GIFWallpaperView: NSViewRepresentable {
-    let url: URL
-
-    func makeNSView(context: Context) -> GIFAnimationNSView {
-        let view = GIFAnimationNSView()
-        view.loadGIF(url: url)
-        return view
-    }
-
-    func updateNSView(_ nsView: GIFAnimationNSView, context: Context) {
-        if nsView.currentURL != url {
-            nsView.loadGIF(url: url)
-        }
-    }
-}
-
-/// AppKit view that renders animated GIF frames into a CALayer.
+/// AppKit view that renders animated GIF frames into a `CALayer` via
+/// `CGAnimateImageAtURLWithBlock`. The system handles frame timing from the
+/// GIF's delay metadata automatically.
 final class GIFAnimationNSView: NSView {
     private var imageLayer: CALayer?
     private var stopped = false

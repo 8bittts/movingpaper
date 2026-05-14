@@ -95,32 +95,16 @@ final class WallpaperWindowRouter {
         let controller = WallpaperWindowController(screen: screen)
         switch plan.type {
         case .video:
-            let view = VideoWallpaperView(
-                url: plan.url,
-                isMuted: isMuted,
-                resumeTime: plan.resumeTime
-            )
-            controller.show(content: view, url: plan.url)
-            // VideoPlayerNSView owns playback resume internally; we only need the
-            // player reference for mute toggle and position save at teardown.
-            DispatchQueue.main.async { [weak controller] in
-                guard let controller,
-                      let videoView = Self.findVideoView(in: controller.panel.contentView)
-                else { return }
-                controller.player = videoView.player
-            }
+            let videoView = VideoPlayerNSView()
+            videoView.loadVideo(url: plan.url, resumeTime: plan.resumeTime)
+            videoView.setMuted(isMuted)
+            controller.show(videoView, url: plan.url)
+            controller.player = videoView.player
         case .gif:
-            controller.show(content: GIFWallpaperView(url: plan.url), url: plan.url)
+            let gifView = GIFAnimationNSView()
+            gifView.loadGIF(url: plan.url)
+            controller.show(gifView, url: plan.url)
         }
         return controller
-    }
-
-    private static func findVideoView(in view: NSView?) -> VideoPlayerNSView? {
-        guard let view else { return nil }
-        if let v = view as? VideoPlayerNSView { return v }
-        for sub in view.subviews {
-            if let found = findVideoView(in: sub) { return found }
-        }
-        return nil
     }
 }
