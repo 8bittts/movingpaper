@@ -15,19 +15,27 @@ struct WallpaperPersistenceStoreTests {
         let key = DesktopKey(displayID: 99, spaceID: 42)
         let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults)
 
-        store.save(
-            mode: .perDesktop,
-            isMuted: false,
-            desktopFiles: [key: wallpaperURL],
-            youtubeURLs: [key: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
+        var state = WallpaperState()
+        state.setEntry(
+            WallpaperEntry(
+                localURL: wallpaperURL,
+                youtubeOrigin: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+            ),
+            for: key
         )
+
+        store.save(mode: .perDesktop, isMuted: false, state: state)
 
         let loaded = store.load()
         #expect(loaded.mode == .perDesktop)
         #expect(loaded.isMuted == false)
-        #expect(loaded.desktopFiles == [key: wallpaperURL])
-        #expect(loaded.youtubeURLs == [key: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"])
-        #expect(loaded.knownSpaces[99] == Set([42]))
+        #expect(loaded.state.entries == [
+            key: WallpaperEntry(
+                localURL: wallpaperURL,
+                youtubeOrigin: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+            )
+        ])
+        #expect(loaded.state.knownSpaces[99] == Set([42]))
         #expect(loaded.needsRedownload.isEmpty)
     }
 
@@ -53,9 +61,8 @@ struct WallpaperPersistenceStoreTests {
 
         let loaded = store.load()
         let key = DesktopKey(displayID: 7, spaceID: 3)
-        #expect(loaded.desktopFiles.isEmpty)
-        #expect(loaded.youtubeURLs == [key: "https://youtu.be/dQw4w9WgXcQ"])
-        #expect(loaded.knownSpaces[7] == Set([3]))
+        #expect(loaded.state.entries.isEmpty)
+        #expect(loaded.state.knownSpaces[7] == Set([3]))
         #expect(loaded.needsRedownload == [
             WallpaperRedownloadRequest(key: key, youtubeURL: "https://youtu.be/dQw4w9WgXcQ"),
         ])
@@ -68,9 +75,8 @@ struct WallpaperPersistenceStoreTests {
         let loaded = WallpaperPersistenceStore(userDefaults: defaults.userDefaults).load()
         #expect(loaded.mode == .allDesktops)
         #expect(loaded.isMuted)
-        #expect(loaded.desktopFiles.isEmpty)
-        #expect(loaded.youtubeURLs.isEmpty)
-        #expect(loaded.knownSpaces.isEmpty)
+        #expect(loaded.state.entries.isEmpty)
+        #expect(loaded.state.knownSpaces.isEmpty)
         #expect(loaded.needsRedownload.isEmpty)
     }
 

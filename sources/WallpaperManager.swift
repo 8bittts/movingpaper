@@ -15,8 +15,8 @@ final class WallpaperManager: ObservableObject {
 
     // MARK: - Published State
 
-    /// Per-desktop file assignments. Key combines display + space.
-    @Published var desktopFiles: [DesktopKey: URL] = [:]
+    /// All per-desktop wallpaper assignments, playback positions, and observed Spaces.
+    @Published var state: WallpaperState = .init()
 
     /// Whether all desktops share one wallpaper or each gets its own.
     @Published var mode: WallpaperMode = .allDesktops
@@ -47,12 +47,6 @@ final class WallpaperManager: ObservableObject {
     private var restoreTask: Task<Void, Never>?
     private var activeDownloadSource: ActiveDownloadSource?
     @Published private(set) var activeSpaceIDs: [CGDirectDisplayID: UInt64] = [:]
-    /// All Space IDs we've seen on each display (macOS has no API to enumerate Spaces).
-    private var knownSpaces: [CGDirectDisplayID: Set<UInt64>] = [:]
-
-    private var youtubeURLs: [DesktopKey: String] = [:]
-    /// Cached playback positions so videos resume where the user left off after space switches.
-    private var playbackPositions: [DesktopKey: CMTime] = [:]
 
     init() {
         refreshManagedDisplaySpaces()
@@ -68,7 +62,7 @@ final class WallpaperManager: ObservableObject {
         activeSpaceIDs = snapshot.activeSpaceByDisplayID
 
         for (displayID, spaces) in snapshot.knownSpacesByDisplayID {
-            knownSpaces[displayID, default: []].formUnion(spaces)
+            state.knownSpaces[displayID, default: []].formUnion(spaces)
         }
     }
 
@@ -81,17 +75,12 @@ final class WallpaperManager: ObservableObject {
     /// In allDesktops mode, returns the single shared file URL (if any).
     var sharedFileURL: URL? {
         guard mode == .allDesktops else { return nil }
-        return desktopFiles.values.first
+        return state.sharedLocalURL
     }
 
     /// File URL for a display, respecting the current mode and space.
     func fileURL(for displayID: CGDirectDisplayID) -> URL? {
-        switch mode {
-        case .allDesktops:
-            return desktopFiles[DesktopKey(displayID: displayID)]
-        case .perDesktop:
-            return desktopFiles[DesktopKey(displayID: displayID, spaceID: currentSpaceID(for: displayID))]
-        }
+        state.localURL(for: desktopKey(for: displayID))
     }
 
     /// Determine file type from URL extension.
@@ -110,19 +99,17 @@ final class WallpaperManager: ObservableObject {
     /// All known Spaces for a display, sorted by space ID.
     /// Includes Spaces with and without wallpapers — we track every Space the user visits.
     func spaceAssignments(for displayID: CGDirectDisplayID) -> [(spaceID: UInt64, fileName: String, isCurrent: Bool)] {
-        let spaces = knownSpaces[displayID] ?? []
+        let spaces = state.knownSpaces[displayID] ?? []
         let currentSpace = currentSpaceID(for: displayID)
         return spaces.sorted().map { spaceID in
             let key = DesktopKey(displayID: displayID, spaceID: spaceID)
-            let fileName = desktopFiles[key]?.lastPathComponent ?? "No MovingPaper"
+            let fileName = state.localURL(for: key)?.lastPathComponent ?? "No MovingPaper"
             return (spaceID: spaceID, fileName: fileName, isCurrent: spaceID == currentSpace)
         }
     }
 
     /// Whether any desktop has a wallpaper assigned.
-    var hasAnyWallpaper: Bool {
-        !desktopFiles.isEmpty
-    }
+    var hasAnyWallpaper: Bool { !state.isEmpty }
 
     // MARK: - File Selection
 
@@ -186,25 +173,23 @@ final class WallpaperManager: ObservableObject {
         applyWallpaper(url: url, for: displayID)
     }
 
-    private func applyWallpaper(url: URL, for displayID: CGDirectDisplayID? = nil, spaceID: UInt64? = nil) {
+    private func applyWallpaper(
+        url: URL,
+        for displayID: CGDirectDisplayID? = nil,
+        spaceID: UInt64? = nil,
+        youtubeOrigin: String? = nil
+    ) {
         isPaused = false
 
         switch mode {
         case .allDesktops:
-            desktopFiles.removeAll()
-            youtubeURLs.removeAll()
-            for screen in NSScreen.screens {
-                if let id = screen.displayID {
-                    desktopFiles[DesktopKey(displayID: id)] = url
-                }
-            }
+            let entry = WallpaperEntry(localURL: url, youtubeOrigin: youtubeOrigin)
+            state.applyShared(entry: entry, across: NSScreen.screens.compactMap(\.displayID))
         case .perDesktop:
             if let id = displayID {
                 let space = spaceID ?? currentSpaceID(for: id)
                 let key = DesktopKey(displayID: id, spaceID: space)
-                desktopFiles[key] = url
-                youtubeURLs.removeValue(forKey: key)
-                knownSpaces[id, default: []].insert(space)
+                state.setEntry(WallpaperEntry(localURL: url, youtubeOrigin: youtubeOrigin), for: key)
             }
         }
 
@@ -239,22 +224,12 @@ final class WallpaperManager: ObservableObject {
             }
             guard requestCoordinator.isCurrent(token, for: target) else { return }
 
-            switch mode {
-            case .allDesktops:
-                youtubeURLs.removeAll()
-                for screen in NSScreen.screens {
-                    if let id = screen.displayID {
-                        youtubeURLs[DesktopKey(displayID: id)] = urlString
-                    }
-                }
-            case .perDesktop:
-                if let id = displayID {
-                    youtubeURLs[DesktopKey(displayID: id, spaceID: originSpaceID)] = urlString
-                    knownSpaces[id, default: []].insert(originSpaceID)
-                }
-            }
-
-            applyWallpaper(url: localURL, for: displayID, spaceID: originSpaceID)
+            applyWallpaper(
+                url: localURL,
+                for: displayID,
+                spaceID: originSpaceID,
+                youtubeOrigin: urlString
+            )
         }
     }
 
@@ -301,10 +276,7 @@ final class WallpaperManager: ObservableObject {
     func clearWallpaper(for displayID: CGDirectDisplayID) {
         cancelAssignment(for: .display(displayID))
         cancelRestoreTask()
-        let key = desktopKey(for: displayID)
-        desktopFiles.removeValue(forKey: key)
-        youtubeURLs.removeValue(forKey: key)
-        playbackPositions.removeValue(forKey: key)
+        state.clearEntry(for: desktopKey(for: displayID))
         if let controller = controllers.removeValue(forKey: displayID) {
             controller.close()
         }
@@ -315,9 +287,8 @@ final class WallpaperManager: ObservableObject {
     func clearAllWallpapers() {
         cancelAllAssignments()
         cancelRestoreTask()
-        desktopFiles.removeAll()
-        youtubeURLs.removeAll()
-        playbackPositions.removeAll()
+        state.entries.removeAll()
+        state.playbackPositions.removeAll()
         tearDownWindows()
         saveState()
     }
@@ -328,32 +299,14 @@ final class WallpaperManager: ObservableObject {
         cancelAllAssignments()
         cancelRestoreTask()
 
-        if newMode == .allDesktops {
-            if let firstURL = desktopFiles.values.first {
-                let firstYT = youtubeURLs.values.first
-                desktopFiles.removeAll()
-                youtubeURLs.removeAll()
-                for screen in NSScreen.screens {
-                    if let id = screen.displayID {
-                        let key = DesktopKey(displayID: id)
-                        desktopFiles[key] = firstURL
-                        if let yt = firstYT { youtubeURLs[key] = yt }
-                    }
-                }
+        switch newMode {
+        case .allDesktops:
+            if let shared = state.entries.values.first {
+                state.applyShared(entry: shared, across: NSScreen.screens.compactMap(\.displayID))
             }
-        } else if newMode == .perDesktop {
-            let oldFiles = desktopFiles
-            let oldYT = youtubeURLs
-            desktopFiles.removeAll()
-            youtubeURLs.removeAll()
-            for (key, url) in oldFiles {
-                let newKey = DesktopKey(
-                    displayID: key.displayID,
-                    spaceID: currentSpaceID(for: key.displayID)
-                )
-                desktopFiles[newKey] = url
-                if let yt = oldYT[key] { youtubeURLs[newKey] = yt }
-                knownSpaces[key.displayID, default: []].insert(newKey.spaceID)
+        case .perDesktop:
+            state.migrateToPerDesktop { [activeSpaceIDs] displayID in
+                activeSpaceIDs[displayID] ?? currentGlobalSpaceID()
             }
         }
 
@@ -401,28 +354,18 @@ final class WallpaperManager: ObservableObject {
     // MARK: - Persistence
 
     private func saveState() {
-        persistenceStore.save(
-            mode: mode,
-            isMuted: isMuted,
-            desktopFiles: desktopFiles,
-            youtubeURLs: youtubeURLs
-        )
+        persistenceStore.save(mode: mode, isMuted: isMuted, state: state)
     }
 
     private func restoreState() {
-        let state = persistenceStore.load()
-        mode = state.mode
-        isMuted = state.isMuted
-        desktopFiles = state.desktopFiles
-        youtubeURLs = state.youtubeURLs
+        let persisted = persistenceStore.load()
+        mode = persisted.mode
+        isMuted = persisted.isMuted
+        state = persisted.state
 
-        for (displayID, spaces) in state.knownSpaces {
-            knownSpaces[displayID, default: []].formUnion(spaces)
-        }
+        scheduleRestoreRedownloads(persisted.needsRedownload)
 
-        scheduleRestoreRedownloads(state.needsRedownload)
-
-        if !desktopFiles.isEmpty {
+        if !state.isEmpty {
             rebuildAllWindows()
         }
     }
@@ -439,7 +382,8 @@ final class WallpaperManager: ObservableObject {
                 let youtubeURL = item.youtubeURL
 
                 guard !Task.isCancelled else { return }
-                guard desktopFiles[key] == nil, youtubeURLs[key] == youtubeURL else { continue }
+                // Skip if the user has filled this slot in the meantime.
+                guard state.entries[key] == nil else { continue }
 
                 activeDownloadSource = .restore
                 guard let localURL = await youtubeDownloader.download(youtubeURL: youtubeURL) else {
@@ -454,10 +398,12 @@ final class WallpaperManager: ObservableObject {
                 }
 
                 guard !Task.isCancelled else { return }
-                guard desktopFiles[key] == nil, youtubeURLs[key] == youtubeURL else { continue }
+                guard state.entries[key] == nil else { continue }
 
-                desktopFiles[key] = localURL
-                knownSpaces[key.displayID, default: []].insert(key.spaceID)
+                state.setEntry(
+                    WallpaperEntry(localURL: localURL, youtubeOrigin: youtubeURL),
+                    for: key
+                )
                 saveState()
                 rebuildAllWindows()
             }
@@ -506,7 +452,7 @@ final class WallpaperManager: ObservableObject {
                 let view = VideoWallpaperView(
                     url: url,
                     isMuted: isMuted,
-                    resumeTime: playbackPositions[key]
+                    resumeTime: state.playbackPositions[key]
                 )
                 controller.show(content: view, url: url)
                 // VideoPlayerNSView owns playback resume internally; we only need
@@ -561,7 +507,7 @@ final class WallpaperManager: ObservableObject {
             guard controller.currentURL != nil else { continue }
             let key = desktopKey(for: displayID)
             if let time = controller.player?.currentTime(), time.isValid, time.seconds > 0 {
-                playbackPositions[key] = time
+                state.playbackPositions[key] = time
             }
         }
     }
@@ -580,24 +526,7 @@ final class WallpaperManager: ObservableObject {
 
                 if self.mode == .allDesktops {
                     let displayIDs = NSScreen.screens.compactMap(\.displayID)
-                    let reconciledFiles = AllDesktopAssignmentReconciler.reconcile(
-                        existing: self.desktopFiles,
-                        connectedDisplayIDs: displayIDs,
-                        sharedValue: self.sharedFileURL
-                    )
-                    let reconciledYouTubeURLs = AllDesktopAssignmentReconciler.reconcile(
-                        existing: self.youtubeURLs,
-                        connectedDisplayIDs: displayIDs,
-                        sharedValue: self.youtubeURLs.values.first
-                    )
-
-                    if reconciledFiles.didChange {
-                        self.desktopFiles = reconciledFiles.assignments
-                    }
-                    if reconciledYouTubeURLs.didChange {
-                        self.youtubeURLs = reconciledYouTubeURLs.assignments
-                    }
-                    if reconciledFiles.didChange || reconciledYouTubeURLs.didChange {
+                    if self.state.reconcileAllDesktops(connectedDisplayIDs: displayIDs) {
                         self.saveState()
                     }
                 }

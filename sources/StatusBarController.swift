@@ -26,7 +26,7 @@ final class StatusBarController {
 
         // Rebuild menu when any relevant state changes (debounced, skip initial emissions)
         Publishers.MergeMany(
-            wallpaperManager.$desktopFiles.dropFirst().map { _ in () }.eraseToAnyPublisher(),
+            wallpaperManager.$state.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             wallpaperManager.$isPaused.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             wallpaperManager.$isMuted.dropFirst().map { _ in () }.eraseToAnyPublisher(),
             wallpaperManager.$mode.dropFirst().map { _ in () }.eraseToAnyPublisher(),
