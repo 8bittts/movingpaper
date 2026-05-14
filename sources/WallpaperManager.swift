@@ -35,7 +35,7 @@ final class WallpaperManager: ObservableObject {
 
     // MARK: - Private State
 
-    private var controllers: [CGDirectDisplayID: WallpaperWindowController] = [:]
+    private let router = WallpaperWindowRouter()
     private var screenObserver: Any?
     private var spaceObserver: Any?
     private var powerMonitor: PowerStateMonitor?
@@ -277,9 +277,7 @@ final class WallpaperManager: ObservableObject {
         cancelAssignment(for: .display(displayID))
         cancelRestoreTask()
         state.clearEntry(for: desktopKey(for: displayID))
-        if let controller = controllers.removeValue(forKey: displayID) {
-            controller.close()
-        }
+        router.closeController(for: displayID)
         saveState()
     }
 
@@ -329,9 +327,7 @@ final class WallpaperManager: ObservableObject {
     func toggleMute() {
         isMuted.toggle()
         saveState()
-        for controller in controllers.values {
-            controller.player?.isMuted = isMuted
-        }
+        router.setMuted(isMuted)
     }
 
     // MARK: - Loading Overlay
@@ -423,54 +419,16 @@ final class WallpaperManager: ObservableObject {
             return
         }
 
-        var activeDisplays = Set<CGDirectDisplayID>()
-
-        for screen in NSScreen.screens {
-            guard let displayID = screen.displayID else { continue }
-            activeDisplays.insert(displayID)
-
+        router.setMuted(isMuted)
+        router.reconcile(screens: NSScreen.screens) { [self] displayID in
             guard let url = fileURL(for: displayID),
-                  let type = fileType(for: url) else {
-                if let controller = controllers.removeValue(forKey: displayID) {
-                    controller.close()
-                }
-                continue
-            }
-
-            if let existing = controllers[displayID] {
-                if existing.currentURL == url {
-                    existing.reposition(to: screen)
-                    continue
-                }
-                existing.close()
-            }
-
-            let controller = WallpaperWindowController(screen: screen)
-            switch type {
-            case .video:
-                let key = desktopKey(for: displayID)
-                let view = VideoWallpaperView(
-                    url: url,
-                    isMuted: isMuted,
-                    resumeTime: state.playbackPositions[key]
-                )
-                controller.show(content: view, url: url)
-                // VideoPlayerNSView owns playback resume internally; we only need
-                // the player reference for mute toggle and position save at teardown.
-                DispatchQueue.main.async { [weak controller] in
-                    guard let controller,
-                          let videoView = Self.findVideoView(in: controller.panel.contentView)
-                    else { return }
-                    controller.player = videoView.player
-                }
-            case .gif:
-                controller.show(content: GIFWallpaperView(url: url), url: url)
-            }
-            controllers[displayID] = controller
-        }
-
-        for displayID in controllers.keys where !activeDisplays.contains(displayID) {
-            controllers.removeValue(forKey: displayID)?.close()
+                  let type = fileType(for: url) else { return nil }
+            let key = desktopKey(for: displayID)
+            return WallpaperWindowRouter.Plan(
+                url: url,
+                type: type,
+                resumeTime: state.playbackPositions[key]
+            )
         }
     }
 
@@ -487,28 +445,12 @@ final class WallpaperManager: ObservableObject {
 
     private func tearDownWindows() {
         savePlaybackPositions()
-        for controller in controllers.values {
-            controller.close()
-        }
-        controllers.removeAll()
-    }
-
-    private static func findVideoView(in view: NSView?) -> VideoPlayerNSView? {
-        guard let view else { return nil }
-        if let v = view as? VideoPlayerNSView { return v }
-        for sub in view.subviews {
-            if let found = findVideoView(in: sub) { return found }
-        }
-        return nil
+        router.closeAll()
     }
 
     private func savePlaybackPositions() {
-        for (displayID, controller) in controllers {
-            guard controller.currentURL != nil else { continue }
-            let key = desktopKey(for: displayID)
-            if let time = controller.player?.currentTime(), time.isValid, time.seconds > 0 {
-                state.playbackPositions[key] = time
-            }
+        for (displayID, time) in router.currentPlaybackTimes() {
+            state.playbackPositions[desktopKey(for: displayID)] = time
         }
     }
 
