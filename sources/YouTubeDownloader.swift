@@ -27,10 +27,7 @@ final class YouTubeDownloader: ObservableObject {
 
     // MARK: - Cache Directory
 
-    static var cacheDirectory: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport.appendingPathComponent("MovingPaper/YouTube", isDirectory: true)
-    }
+    static var cacheDirectory: URL { AppPaths.youtubeCache }
 
     /// Returns the cached file URL if the video has already been downloaded.
     static func cachedFile(for videoID: String) -> URL? {
@@ -40,15 +37,9 @@ final class YouTubeDownloader: ObservableObject {
 
     // MARK: - yt-dlp Binary
 
-    /// yt-dlp binary location in Application Support (downloaded on first use).
-    private static var ytdlpInstallPath: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport.appendingPathComponent("MovingPaper/yt-dlp")
-    }
-
     /// Path to the yt-dlp binary. Checks Application Support first, then dev tools/.
     private static var ytdlpPath: String? {
-        let installed = ytdlpInstallPath.path(percentEncoded: false)
+        let installed = AppPaths.ytdlpBinary.path(percentEncoded: false)
         if FileManager.default.fileExists(atPath: installed) {
             return installed
         }
@@ -64,7 +55,7 @@ final class YouTubeDownloader: ObservableObject {
     static func ensureYTDLP() async -> String? {
         if let existing = ytdlpPath { return existing }
 
-        let installURL = ytdlpInstallPath
+        let installURL = AppPaths.ytdlpBinary
         let dir = installURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 

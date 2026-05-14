@@ -1,22 +1,31 @@
 import AppKit
 
-/// Menu bar icon for MovingPaper.
-/// Loads a pre-rounded brand image from the resource bundle.
+/// Brand icon assets for MovingPaper.
+/// The PNG is loaded once and reused for the menu bar item and the app icon.
 @MainActor
 enum MenuBarIcon {
     static let pointSize = NSSize(width: 22, height: 22)
 
+    private static let cachedImage: NSImage? = Bundle.module
+        .url(forResource: "movingpaper-icon", withExtension: "png", subdirectory: "Resources")
+        .flatMap(NSImage.init(contentsOf:))
+
+    /// Pre-rounded brand image sized for the status bar item.
     static func brandIcon() -> NSImage {
-        // Load pre-rounded icon (corners baked into the PNG)
-        if let url = Bundle.module.url(forResource: "movingpaper-icon", withExtension: "png", subdirectory: "Resources"),
-           let img = NSImage(contentsOf: url) {
-            img.size = pointSize
-            img.isTemplate = false
-            return img
+        if let cached = cachedImage {
+            let copy = cached.copy() as? NSImage ?? cached
+            copy.size = pointSize
+            copy.isTemplate = false
+            return copy
         }
 
         let fallback = NSImage(systemSymbolName: "cloud.moon.fill", accessibilityDescription: "MovingPaper") ?? NSImage()
         fallback.size = pointSize
         return fallback
+    }
+
+    /// Full-resolution brand image suitable for `NSApp.applicationIconImage`.
+    static func applicationIcon() -> NSImage? {
+        cachedImage.flatMap { $0.copy() as? NSImage }
     }
 }

@@ -38,7 +38,7 @@ final class WallpaperManager: ObservableObject {
     private var controllers: [CGDirectDisplayID: WallpaperWindowController] = [:]
     private var screenObserver: Any?
     private var spaceObserver: Any?
-    private var powerObservers: [Any] = []
+    private var powerMonitor: PowerStateMonitor?
     private var systemPaused: Bool = false
     private let loadingOverlay = LoadingOverlayController()
     private var downloadOverlayObserver: AnyCancellable?
@@ -502,22 +502,20 @@ final class WallpaperManager: ObservableObject {
             let controller = WallpaperWindowController(screen: screen)
             switch type {
             case .video:
-                let view = VideoWallpaperView(url: url, isMuted: isMuted)
-                controller.show(content: view, url: url)
                 let key = desktopKey(for: displayID)
-                let resume = playbackPositions[key]
-                // Grab player reference and seek after the video has started loading.
-                // Two-stage: async to let SwiftUI create the NSView, then 0.3s for
-                // AVPlayerLooper to finish setup and the item to begin playback.
+                let view = VideoWallpaperView(
+                    url: url,
+                    isMuted: isMuted,
+                    resumeTime: playbackPositions[key]
+                )
+                controller.show(content: view, url: url)
+                // VideoPlayerNSView owns playback resume internally; we only need
+                // the player reference for mute toggle and position save at teardown.
                 DispatchQueue.main.async { [weak controller] in
-                    guard let controller else { return }
-                    if let videoView = Self.findVideoView(in: controller.panel.contentView) {
-                        controller.player = videoView.player
-                    }
-                    guard let resume, resume.isValid, resume.seconds > 0.1 else { return }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak controller] in
-                        controller?.player?.seek(to: resume, toleranceBefore: .zero, toleranceAfter: .zero)
-                    }
+                    guard let controller,
+                          let videoView = Self.findVideoView(in: controller.panel.contentView)
+                    else { return }
+                    controller.player = videoView.player
                 }
             case .gif:
                 controller.show(content: GIFWallpaperView(url: url), url: url)
@@ -537,10 +535,8 @@ final class WallpaperManager: ObservableObject {
         removeScreenObserver()
         removeSpaceObserver()
         downloadOverlayObserver = nil
-        for observer in powerObservers {
-            NotificationCenter.default.removeObserver(observer)
-        }
-        powerObservers.removeAll()
+        powerMonitor?.stop()
+        powerMonitor = nil
     }
 
     private func tearDownWindows() {
@@ -649,31 +645,14 @@ final class WallpaperManager: ObservableObject {
     // MARK: - Power Management
 
     private func observePowerState() {
-        let lowPower = NotificationCenter.default.addObserver(
-            forName: .NSProcessInfoPowerStateDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in self?.evaluatePowerState() }
+        let monitor = PowerStateMonitor { [weak self] shouldPause in
+            self?.applyPowerVerdict(shouldPause: shouldPause)
         }
-        powerObservers.append(lowPower)
-
-        let thermal = NotificationCenter.default.addObserver(
-            forName: ProcessInfo.thermalStateDidChangeNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in self?.evaluatePowerState() }
-        }
-        powerObservers.append(thermal)
+        powerMonitor = monitor
+        monitor.start()
     }
 
-    private func evaluatePowerState() {
-        let shouldPause =
-            ProcessInfo.processInfo.isLowPowerModeEnabled
-            || ProcessInfo.processInfo.thermalState == .serious
-            || ProcessInfo.processInfo.thermalState == .critical
-
+    private func applyPowerVerdict(shouldPause: Bool) {
         if shouldPause && !systemPaused {
             systemPaused = true
             tearDownWindows()

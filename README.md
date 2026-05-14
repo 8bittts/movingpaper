@@ -42,6 +42,21 @@ Open the `.dmg`, drag **MovingPaper** to Applications, launch it. Look for the n
 
 > Code-signed with Developer ID and notarized by Apple. Auto-updates via Sparkle.
 
+### Homebrew
+
+The repo doubles as a Homebrew tap, so you can install via [Homebrew Cask](https://docs.brew.sh/Cask-Cookbook) without leaving the terminal:
+
+```bash
+# One-shot install of the latest release (no tap):
+brew install --cask https://raw.githubusercontent.com/8bittts/movingpaper/main/Casks/movingpaper.rb
+
+# Or tap the repo for ongoing `brew upgrade` updates:
+brew tap 8bittts/movingpaper https://github.com/8bittts/movingpaper
+brew install --cask 8bittts/movingpaper/movingpaper
+```
+
+The Cask formula in [`Casks/movingpaper.rb`](Casks/movingpaper.rb) is pinned to the current release. Sparkle auto-update keeps installed apps current between Cask bumps.
+
 ---
 
 ## What It Does

@@ -32,8 +32,7 @@ final class PhotosService: @unchecked Sendable {
     }
 
     nonisolated private func exportVideo(asset: PHAsset) async -> URL? {
-        let cacheDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("MovingPaper/PhotosShuffle", isDirectory: true)
+        let cacheDir = AppPaths.photosShuffleCache
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
 
         let destURL = cacheDir.appendingPathComponent("\(asset.localIdentifier.replacingOccurrences(of: "/", with: "-")).mp4")

@@ -82,8 +82,7 @@ extension PhotosPickerController: PHPickerViewControllerDelegate {
             return
         }
 
-        let cacheDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("MovingPaper/Photos", isDirectory: true)
+        let cacheDir = AppPaths.photosPickerCache
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
 
         let provider = result.itemProvider

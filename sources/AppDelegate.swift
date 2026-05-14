@@ -33,17 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func installApplicationIcon() {
-        guard
-            let iconURL = Bundle.module.url(
-                forResource: "movingpaper-icon",
-                withExtension: "png",
-                subdirectory: "Resources"
-            ),
-            let icon = NSImage(contentsOf: iconURL)
-        else {
-            return
-        }
-
+        guard let icon = MenuBarIcon.applicationIcon() else { return }
         NSApp.applicationIconImage = icon
     }
 }

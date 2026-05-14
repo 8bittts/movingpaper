@@ -1,4 +1,5 @@
 import AVFoundation
+import Combine
 import SwiftUI
 
 /// Seamlessly looping video wallpaper using AVQueuePlayer + AVPlayerLooper.
@@ -6,17 +7,19 @@ import SwiftUI
 struct VideoWallpaperView: NSViewRepresentable {
     let url: URL
     var isMuted: Bool = true
+    /// If set, the player seeks here once the first item is ready to play.
+    var resumeTime: CMTime?
 
     func makeNSView(context: Context) -> VideoPlayerNSView {
         let view = VideoPlayerNSView()
-        view.loadVideo(url: url)
+        view.loadVideo(url: url, resumeTime: resumeTime)
         view.setMuted(isMuted)
         return view
     }
 
     func updateNSView(_ nsView: VideoPlayerNSView, context: Context) {
         if nsView.currentURL != url {
-            nsView.loadVideo(url: url)
+            nsView.loadVideo(url: url, resumeTime: resumeTime)
         }
         nsView.setMuted(isMuted)
     }
@@ -28,6 +31,7 @@ final class VideoPlayerNSView: NSView {
     private var looper: AVPlayerLooper?
     private var playerLayer: AVPlayerLayer?
     private(set) var currentURL: URL?
+    private var statusObserver: AnyCancellable?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -44,7 +48,8 @@ final class VideoPlayerNSView: NSView {
         playerLayer?.frame = bounds
     }
 
-    func loadVideo(url: URL) {
+    func loadVideo(url: URL, resumeTime: CMTime? = nil) {
+        statusObserver = nil
         player?.pause()
         looper = nil
         player = nil
@@ -67,6 +72,17 @@ final class VideoPlayerNSView: NSView {
         self.looper = playerLooper
         self.playerLayer = layer
 
+        if let resumeTime, resumeTime.isValid, resumeTime.seconds > 0.1 {
+            statusObserver = item
+                .publisher(for: \.status)
+                .filter { $0 == .readyToPlay }
+                .first()
+                .sink { [weak self] _ in
+                    queuePlayer.seek(to: resumeTime, toleranceBefore: .zero, toleranceAfter: .zero)
+                    self?.statusObserver = nil
+                }
+        }
+
         queuePlayer.play()
     }
 
@@ -75,6 +91,7 @@ final class VideoPlayerNSView: NSView {
     }
 
     override func removeFromSuperview() {
+        statusObserver = nil
         player?.pause()
         looper = nil
         player = nil
