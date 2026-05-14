@@ -5,9 +5,11 @@ import AppKit
 @MainActor
 enum MenuBarIcon {
     static let pointSize = NSSize(width: 22, height: 22)
-    /// macOS "squircle" corner ratio used by Big Sur+ app icons. Gives the
-    /// menu bar item the same rounded shape as native app icons (e.g. DockishOS).
-    private static let cornerRadiusRatio: CGFloat = 0.22
+    /// Rounded-rect approximation of the macOS Big Sur+ "squircle" app icon
+    /// shape. AppKit doesn't expose a continuous-corner path, so we use a
+    /// slightly larger ratio than the geometric 22 % so the rounded rectangle
+    /// reads visually as rounded as the true squircle (e.g. DockishOS).
+    private static let cornerRadiusRatio: CGFloat = 0.32
 
     private static let cachedImage: NSImage? = Bundle.module
         .url(forResource: "movingpaper-icon", withExtension: "png", subdirectory: "Resources")
