@@ -341,8 +341,8 @@ tell application "Finder"
         set icon size of theViewOptions to ${DMG_ICON_SIZE}
         set text size of theViewOptions to 14
         $BG_CMD
-        set position of item "${APP_NAME}.app" of container window to {200, 200}
-        set position of item "Applications" of container window to {460, 200}
+        set position of item "${APP_NAME}.app" of container window to {200, 170}
+        set position of item "Applications" of container window to {460, 170}
         try
             set position of item ".background" of container window to {330, 900}
         end try
