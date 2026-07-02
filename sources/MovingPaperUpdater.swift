@@ -66,6 +66,7 @@ final class MovingPaperUpdater: NSObject, ObservableObject {
         }
 
         status = .checking
+        AppPresentation.promoteToForeground()
         startFloatingWindows()
         controller.updater.checkForUpdates()
     }
@@ -136,6 +137,15 @@ extension MovingPaperUpdater: SPUUpdaterDelegate {
 
 @MainActor
 extension MovingPaperUpdater: @preconcurrency SPUStandardUserDriverDelegate {
+
+    /// Modal alerts ("You're up to date", update errors, permission prompts) only
+    /// fire this hook — not `willHandleShowingUpdate` — so a menu-bar (accessory)
+    /// app must foreground itself here too, or the alert surfaces without focus or
+    /// behind other windows. Mirrors the update-available path below.
+    func standardUserDriverWillShowModalAlert() {
+        AppPresentation.promoteToForeground()
+        startFloatingWindows()
+    }
 
     func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool, forUpdate update: SUAppcastItem, state: SPUUserUpdateState) {
         guard handleShowingUpdate else { return }

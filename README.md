@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <!-- version-badge -->v0.037<!-- /version-badge --> · macOS 15+ · Swift 6 · MIT · <a href="https://x.com/8BIT/status/2043384259482902603">Short Demo</a>
+  <!-- version-badge -->v0.037<!-- /version-badge --> · macOS 15+ · Apple Silicon · Swift 6 · MIT · <a href="https://x.com/8BIT/status/2043384259482902603">Short Demo</a>
 </p>
 
 ---
@@ -40,7 +40,7 @@ It's the kind of app that makes you smile every time you minimize a window.
 
 Open the `.dmg`, drag **MovingPaper** to Applications, launch it. Look for the night sky icon in your menu bar -- that's it.
 
-> Code-signed with Developer ID and notarized by Apple. Auto-updates via Sparkle.
+> Apple Silicon (arm64). Code-signed with Developer ID and notarized by Apple. Auto-updates via Sparkle.
 
 ### Homebrew
 
@@ -80,7 +80,7 @@ Plays a looping video or GIF as your desktop background. Everything on your desk
 - **Sound control** -- mute or unmute video audio (muted by default)
 - **Multi-monitor** -- auto-detects displays, adapts on hot-plug
 - **Power-aware** -- pauses on Low Power Mode and thermal throttling
-- **Automatic update checks** -- checks hourly via Sparkle using a custom app-owned updater dialog that stays dockless, with signed feeds and verify-before-extraction enabled in staged builds
+- **Automatic update checks** -- checks hourly via Sparkle using its standard updater dialog kept dockless (app-managed activation policy), with signed feeds and verify-before-extraction enabled in staged builds
 - **Persistent** -- your wallpapers come back when you relaunch
 - **Menu bar only** -- no Dock icon during normal use, update checks, or update install prompts
 
@@ -96,7 +96,7 @@ Plays a looping video or GIF as your desktop background. Everything on your desk
 | **MovingPaper Mode** | All Desktops or Per Desktop |
 | **Pause / Resume** | Stop or restart playback |
 | **Remove MovingPaper** | Clear wallpaper |
-| **Check for Updates...** | Sparkle update check in MovingPaper's custom dockless updater dialog |
+| **Check for Updates...** | Sparkle update check in a dockless updater dialog |
 | **Built with YEN** | Visit yen.chat |
 | **Quit MovingPaper** | Exit |
 
