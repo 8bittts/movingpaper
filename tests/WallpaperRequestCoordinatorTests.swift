@@ -82,6 +82,46 @@ struct WallpaperRequestCoordinatorTests {
         await Task.yield()
     }
 
+    @Test @MainActor func cancelPropagatesCancellationIntoTheRunningTask() async {
+        let coordinator = WallpaperRequestCoordinator()
+        var started = false
+        var sawCancellation = false
+
+        coordinator.start(for: .allDesktops) { _ in
+            started = true
+            // Suspends until the coordinator cancels the backing Task.
+            try? await Task.sleep(for: .seconds(60))
+            sawCancellation = Task.isCancelled
+        }
+
+        await Task.yield()
+        #expect(started)
+
+        coordinator.cancel(.allDesktops)
+        // Let the cancelled sleep unwind.
+        for _ in 0..<5 { await Task.yield() }
+
+        #expect(sawCancellation)
+    }
+
+    @Test @MainActor func normalCompletionClearsTheToken() async {
+        let coordinator = WallpaperRequestCoordinator()
+        var capturedToken: UUID?
+
+        // Runs to completion immediately; the deferred finish() should clear it.
+        coordinator.start(for: .allDesktops) { token in
+            capturedToken = token
+        }
+
+        for _ in 0..<5 { await Task.yield() }
+
+        if let capturedToken {
+            #expect(coordinator.isCurrent(capturedToken, for: .allDesktops) == false)
+        } else {
+            Issue.record("operation never ran")
+        }
+    }
+
     @Test @MainActor func cancelingOneTargetLeavesOtherTargetsCurrent() async {
         let coordinator = WallpaperRequestCoordinator()
         var allDesktopsToken: UUID?
