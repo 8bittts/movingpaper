@@ -50,10 +50,14 @@ final class VideoPlayerNSView: NSView {
         self.playerLayer = layer
 
         if let resumeTime, resumeTime.isValid, resumeTime.seconds > 0.1 {
-            statusObserver = item
+            // Observe the queue player itself (not the looper's template item, whose
+            // status can stay `.unknown` since it is never enqueued for playback),
+            // and deliver on the main thread before touching main-actor state.
+            statusObserver = queuePlayer
                 .publisher(for: \.status)
                 .filter { $0 == .readyToPlay }
                 .first()
+                .receive(on: DispatchQueue.main)
                 .sink { [weak self] _ in
                     queuePlayer.seek(to: resumeTime, toleranceBefore: .zero, toleranceAfter: .zero)
                     self?.statusObserver = nil

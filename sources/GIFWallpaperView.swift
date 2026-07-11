@@ -6,7 +6,26 @@ import ImageIO
 /// GIF's delay metadata automatically.
 final class GIFAnimationNSView: NSView {
     private var imageLayer: CALayer?
-    private var stopped = false
+
+    // The animation callback runs on a background thread, so the "is this
+    // animation still current?" flag must be read/written under a lock. Each
+    // `loadGIF`/`stopAnimation` bumps the generation; a callback whose captured
+    // token no longer matches stops itself, preventing a stale second loop.
+    private let stateLock = NSLock()
+    nonisolated(unsafe) private var generation = 0
+
+    private nonisolated func bumpGeneration() -> Int {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        generation += 1
+        return generation
+    }
+
+    private nonisolated func isCurrent(_ token: Int) -> Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return token == generation
+    }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -30,14 +49,14 @@ final class GIFAnimationNSView: NSView {
     }
 
     func loadGIF(url: URL) {
-        stopAnimation()
-        stopped = false
+        imageLayer?.contents = nil
+        let token = bumpGeneration()
 
         _ = CGAnimateImageAtURLWithBlock(
             url as CFURL,
             nil
         ) { [weak self] _, cgImage, stop in
-            guard let self, !self.stopped else {
+            guard let self, self.isCurrent(token) else {
                 stop.pointee = true
                 return
             }
@@ -45,14 +64,15 @@ final class GIFAnimationNSView: NSView {
                 self.imageLayer?.contents = cgImage
             } else {
                 DispatchQueue.main.async { [weak self] in
-                    self?.imageLayer?.contents = cgImage
+                    guard let self, self.isCurrent(token) else { return }
+                    self.imageLayer?.contents = cgImage
                 }
             }
         }
     }
 
     func stopAnimation() {
-        stopped = true
+        _ = bumpGeneration()
         imageLayer?.contents = nil
     }
 
