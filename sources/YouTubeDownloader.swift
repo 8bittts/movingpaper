@@ -37,6 +37,16 @@ final class YouTubeDownloader: ObservableObject {
         case failed(String)
     }
 
+    /// Result of a single `download` call. Lets the caller report failures from
+    /// *this* call instead of reading the shared, mutable `state` (which a
+    /// concurrent download can overwrite).
+    enum DownloadOutcome: Equatable {
+        case success(URL)
+        case failure(String)
+        /// Superseded by a newer download or cancelled — nothing to apply or report.
+        case cancelled
+    }
+
     @Published private(set) var state: State = .idle
 
     private var process: Process?
@@ -117,18 +127,18 @@ final class YouTubeDownloader: ObservableObject {
 
     // MARK: - Download
 
-    /// Download a YouTube video and return the local file URL.
-    /// Returns nil on failure (state will be .failed with a message).
-    func download(youtubeURL: String) async -> URL? {
+    /// Download a YouTube video, returning the outcome (URL, failure message, or
+    /// cancelled/superseded). Also updates `state` to drive the progress overlay.
+    func download(youtubeURL: String) async -> DownloadOutcome {
         guard let videoID = YouTubeURLParser.videoID(from: youtubeURL) else {
             state = .failed("Invalid YouTube URL")
-            return nil
+            return .failure("Invalid YouTube URL")
         }
 
         // Check cache first
         if let cached = Self.cachedFile(for: videoID) {
             state = .idle
-            return cached
+            return .success(cached)
         }
 
         let ytdlp: String
@@ -137,8 +147,9 @@ final class YouTubeDownloader: ObservableObject {
         } else if let downloaded = await Self.ensureYTDLP() {
             ytdlp = downloaded
         } else {
-            state = .failed("Could not download yt-dlp. Check your internet connection.")
-            return nil
+            let message = "Could not download yt-dlp. Check your internet connection."
+            state = .failed(message)
+            return .failure(message)
         }
 
         // Ensure cache directory exists
@@ -173,7 +184,7 @@ final class YouTubeDownloader: ObservableObject {
 
         guard activeDownloadID == downloadID else {
             try? FileManager.default.removeItem(atPath: partialPath)
-            return nil
+            return .cancelled
         }
 
         activeDownloadID = nil
@@ -182,23 +193,24 @@ final class YouTubeDownloader: ObservableObject {
         case .cancelled:
             state = .idle
             try? FileManager.default.removeItem(atPath: partialPath)
-            return nil
+            return .cancelled
         case .failed(let message):
             try? FileManager.default.removeItem(atPath: outputPath)
             try? FileManager.default.removeItem(atPath: partialPath)
             state = .failed(message)
-            return nil
+            return .failure(message)
         case .succeeded:
             break
         }
 
         guard FileManager.default.fileExists(atPath: outputPath) else {
-            state = .failed("Download completed but file not found")
-            return nil
+            let message = "Download completed but file not found"
+            state = .failed(message)
+            return .failure(message)
         }
 
         state = .idle
-        return URL(filePath: outputPath)
+        return .success(URL(filePath: outputPath))
     }
 
     /// Cancel an in-progress download.

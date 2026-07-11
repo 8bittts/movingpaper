@@ -19,4 +19,10 @@ struct YouTubeDownloaderTests {
         #expect(!YouTubeDownloader.pinnedYTDLPVersion.isEmpty)
         #expect(YouTubeDownloader.pinnedYTDLPSHA256.count == 64)
     }
+
+    @Test @MainActor func invalidURLReturnsFailureOutcomeNotSuccess() async {
+        let downloader = YouTubeDownloader()
+        let outcome = await downloader.download(youtubeURL: "https://example.com/not-youtube")
+        #expect(outcome == .failure("Invalid YouTube URL"))
+    }
 }

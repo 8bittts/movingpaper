@@ -221,21 +221,22 @@ final class WallpaperManager {
         cancelRestoreTask()
         requestCoordinator.start(for: target) { [weak self] token in
             guard let self else { return }
-            guard let localURL = await youtubeDownloader.download(youtubeURL: urlString) else {
-                guard requestCoordinator.isCurrent(token, for: target) else { return }
-                if case .failed(let msg) = youtubeDownloader.state {
-                    showAlert(title: "Download Failed", message: msg)
-                }
-                return
-            }
+            let outcome = await youtubeDownloader.download(youtubeURL: urlString)
             guard requestCoordinator.isCurrent(token, for: target) else { return }
 
-            applyWallpaper(
-                url: localURL,
-                for: displayID,
-                spaceID: originSpaceID,
-                youtubeOrigin: urlString
-            )
+            switch outcome {
+            case .success(let localURL):
+                applyWallpaper(
+                    url: localURL,
+                    for: displayID,
+                    spaceID: originSpaceID,
+                    youtubeOrigin: urlString
+                )
+            case .failure(let msg):
+                showAlert(title: "Download Failed", message: msg)
+            case .cancelled:
+                break
+            }
         }
     }
 
@@ -394,7 +395,7 @@ final class WallpaperManager {
                 guard !Task.isCancelled else { return }
                 guard state.entries[key] == nil else { continue }
 
-                guard let localURL = await youtubeDownloader.download(youtubeURL: youtubeURL) else {
+                guard case .success(let localURL) = await youtubeDownloader.download(youtubeURL: youtubeURL) else {
                     guard !Task.isCancelled else { return }
                     continue
                 }
