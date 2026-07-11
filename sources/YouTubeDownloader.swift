@@ -69,20 +69,6 @@ final class YouTubeDownloader: ObservableObject {
 
     // MARK: - yt-dlp Binary
 
-    /// Path to the yt-dlp binary. Checks Application Support first, then dev tools/.
-    private nonisolated static var ytdlpPath: String? {
-        let installed = AppPaths.ytdlpBinary.path(percentEncoded: false)
-        if FileManager.default.fileExists(atPath: installed) {
-            return installed
-        }
-        // Dev build: tools directory relative to working directory
-        let devPath = "tools/yt-dlp/yt-dlp"
-        if FileManager.default.fileExists(atPath: devPath) {
-            return devPath
-        }
-        return nil
-    }
-
     /// Pinned yt-dlp release. Bump both fields together — the SHA-256 is checked
     /// against the downloaded binary before it's installed and made executable.
     /// Refresh via `curl -fsSL https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest`
@@ -90,12 +76,36 @@ final class YouTubeDownloader: ObservableObject {
     nonisolated static let pinnedYTDLPVersion = "2026.03.17"
     nonisolated static let pinnedYTDLPSHA256 = "e80c47b3ce712acee51d5e3d4eace2d181b44d38f1942c3a32e3c7ff53cd9ed5"
 
-    /// Download yt-dlp if not already installed. Returns path on success.
-    /// Verifies the downloaded binary against the pinned SHA-256 before installing.
-    /// `nonisolated` so the 40 MB hash + write run off the main actor.
-    nonisolated static func ensureYTDLP() async -> String? {
-        if let existing = ytdlpPath { return existing }
+    /// Path to a dev-tree yt-dlp binary (arbitrary version, trusted as-is).
+    private nonisolated static var developerBinaryPath: String? {
+        let devPath = "tools/yt-dlp/yt-dlp"
+        return FileManager.default.fileExists(atPath: devPath) ? devPath : nil
+    }
 
+    /// Resolve a trusted yt-dlp binary path: the dev binary if present, else an
+    /// installed copy **re-verified against the pinned SHA-256** (so a corrupt or
+    /// pin-stale binary is never executed and is re-downloaded), else a fresh
+    /// download+verify+install. `nonisolated` so the 40 MB hash + write stay off
+    /// the main actor; only reached on a cache miss, so cached videos never pay it.
+    nonisolated static func ensureYTDLP() async -> String? {
+        if let devPath = developerBinaryPath { return devPath }
+
+        let installURL = AppPaths.ytdlpBinary
+        let installedPath = installURL.path(percentEncoded: false)
+
+        if FileManager.default.fileExists(atPath: installedPath) {
+            if let data = try? Data(contentsOf: installURL), sha256Hex(of: data) == pinnedYTDLPSHA256 {
+                return installedPath
+            }
+            // Corrupt, tampered, or stale after a pin bump — discard and re-fetch.
+            Log.youtube.error("Installed yt-dlp failed SHA-256 verification; re-downloading")
+            try? FileManager.default.removeItem(at: installURL)
+        }
+
+        return await downloadAndInstallYTDLP()
+    }
+
+    private nonisolated static func downloadAndInstallYTDLP() async -> String? {
         let installURL = AppPaths.ytdlpBinary
         let dir = installURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -151,12 +161,7 @@ final class YouTubeDownloader: ObservableObject {
             return .success(cached)
         }
 
-        let ytdlp: String
-        if let existing = Self.ytdlpPath {
-            ytdlp = existing
-        } else if let downloaded = await Self.ensureYTDLP() {
-            ytdlp = downloaded
-        } else {
+        guard let ytdlp = await Self.ensureYTDLP() else {
             let message = "Could not download yt-dlp. Check your internet connection."
             state = .failed(message)
             return .failure(message)
