@@ -59,8 +59,7 @@ struct WallpaperState: Equatable {
     }
 
     /// Drop assignments for displays not in `connectedDisplayIDs` and pin the
-    /// shared value (if any) to every connected display. Mirrors
-    /// `AllDesktopAssignmentReconciler` but operates on full entries.
+    /// shared value (if any) to every connected display.
     @discardableResult
     mutating func reconcileAllDesktops(connectedDisplayIDs: [CGDirectDisplayID]) -> Bool {
         guard let shared = entries.values.first else { return false }

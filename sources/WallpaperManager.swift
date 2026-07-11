@@ -5,21 +5,21 @@ import Combine
 /// Central coordinator: manages per-screen wallpaper windows, file selection,
 /// playback state, sound, space tracking, and power-aware pause/resume.
 @MainActor
-final class WallpaperManager: ObservableObject {
+final class WallpaperManager {
 
-    // MARK: - Published State
+    // MARK: - State
 
     /// All per-desktop wallpaper assignments, playback positions, and observed Spaces.
-    @Published var state: WallpaperState = .init()
+    var state: WallpaperState = .init()
 
     /// Whether all desktops share one wallpaper or each gets its own.
-    @Published var mode: WallpaperMode = .allDesktops
+    var mode: WallpaperMode = .allDesktops
 
     /// User-initiated pause (distinct from system pause).
-    @Published var isPaused: Bool = false
+    var isPaused: Bool = false
 
     /// Whether video audio is muted.
-    @Published var isMuted: Bool = true
+    var isMuted: Bool = true
 
     /// YouTube downloader for pasting YouTube URLs as wallpapers.
     let youtubeDownloader = YouTubeDownloader()
@@ -39,7 +39,7 @@ final class WallpaperManager: ObservableObject {
     private let requestCoordinator = WallpaperRequestCoordinator()
     private let persistenceStore = WallpaperPersistenceStore()
     private var restoreTask: Task<Void, Never>?
-    @Published private(set) var activeSpaceIDs: [CGDirectDisplayID: UInt64] = [:]
+    private(set) var activeSpaceIDs: [CGDirectDisplayID: UInt64] = [:]
 
     init() {
         refreshManagedDisplaySpaces()
@@ -87,6 +87,11 @@ final class WallpaperManager: ObservableObject {
             guard let id = screen.displayID else { return nil }
             return (id: id, name: screen.localizedName)
         }
+    }
+
+    /// Display IDs of all connected screens.
+    private var connectedDisplayIDs: [CGDirectDisplayID] {
+        NSScreen.screens.compactMap(\.displayID)
     }
 
     /// All known Spaces for a display, sorted by space ID.
@@ -149,11 +154,14 @@ final class WallpaperManager: ObservableObject {
         }
     }
 
-    /// Assign a wallpaper file. In perDesktop mode, `spaceID` pins to a specific
-    /// space (use when the result arrives async and the user may have switched spaces).
+    /// Assign a wallpaper file: cancel the in-flight assignment for the target,
+    /// then apply the wallpaper synchronously on the current space.
+    ///
+    /// This path uses only a local file (never the shared `YouTubeDownloader`), so
+    /// it deliberately does NOT cancel the restore-redownload batch — that batch
+    /// self-skips any key already assigned (`state.entries[key] == nil` guard).
     func setWallpaper(url: URL, for displayID: CGDirectDisplayID? = nil) {
         cancelAssignment(for: assignmentTarget(for: displayID))
-        cancelRestoreTask()
         applyWallpaper(url: url, for: displayID)
     }
 
@@ -168,7 +176,7 @@ final class WallpaperManager: ObservableObject {
         switch mode {
         case .allDesktops:
             let entry = WallpaperEntry(localURL: url, youtubeOrigin: youtubeOrigin)
-            state.applyShared(entry: entry, across: NSScreen.screens.compactMap(\.displayID))
+            state.applyShared(entry: entry, across: connectedDisplayIDs)
         case .perDesktop:
             if let id = displayID {
                 let space = spaceID ?? currentSpaceID(for: id)
@@ -222,7 +230,6 @@ final class WallpaperManager: ObservableObject {
         AppPresentation.promoteToForeground()
         let target = assignmentTarget(for: displayID)
         let originSpaceID = displayID.map { currentSpaceID(for: $0) } ?? 0
-        cancelRestoreTask()
         requestCoordinator.start(for: target) { [weak self] token in
             guard let self else { return }
             loadingOverlay.show(message: "Shuffling...")
@@ -253,7 +260,6 @@ final class WallpaperManager: ObservableObject {
     /// Remove wallpaper from a specific display (current space in perDesktop mode).
     func clearWallpaper(for displayID: CGDirectDisplayID) {
         cancelAssignment(for: .display(displayID))
-        cancelRestoreTask()
         state.clearEntry(for: desktopKey(for: displayID))
         router.closeController(for: displayID)
         saveState()
@@ -278,7 +284,7 @@ final class WallpaperManager: ObservableObject {
         switch newMode {
         case .allDesktops:
             if let shared = state.entries.values.first {
-                state.applyShared(entry: shared, across: NSScreen.screens.compactMap(\.displayID))
+                state.applyShared(entry: shared, across: connectedDisplayIDs)
             }
         case .perDesktop:
             state.migrateToPerDesktop { [activeSpaceIDs] displayID in
@@ -434,8 +440,7 @@ final class WallpaperManager: ObservableObject {
                 self.refreshManagedDisplaySpaces()
 
                 if self.mode == .allDesktops {
-                    let displayIDs = NSScreen.screens.compactMap(\.displayID)
-                    if self.state.reconcileAllDesktops(connectedDisplayIDs: displayIDs) {
+                    if self.state.reconcileAllDesktops(connectedDisplayIDs: self.connectedDisplayIDs) {
                         self.saveState()
                     }
                 }
