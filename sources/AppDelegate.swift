@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let protectedPaths = manager.referencedLocalPaths
         Task.detached(priority: .utility) {
             CacheJanitor.enforceDefaultPolicies(protecting: protectedPaths)
+            CacheJanitor.pruneUnreferencedPhotosCaches(referencedPaths: protectedPaths)
         }
 
         let sparkleUpdater = MovingPaperUpdater()

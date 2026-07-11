@@ -87,4 +87,44 @@ enum CacheJanitor {
             protectedPaths: protectedPaths
         )
     }
+
+    /// Delete files in `directory` not referenced by any live wallpaper. Unlike
+    /// byte-budget eviction, this only removes genuinely orphaned files (no
+    /// assignment points at them), so it is safe for the Photos picker/shuffle
+    /// caches whose files can't otherwise be recovered — there is nothing to
+    /// recover for a file no wallpaper uses. Bounds their otherwise-unbounded
+    /// growth (picker exports use unique UUID names and never dedup).
+    @discardableResult
+    static func pruneUnreferenced(
+        directory: URL,
+        referencedPaths: Set<String>,
+        fileManager: FileManager = .default
+    ) -> Int {
+        guard let entries = try? fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else {
+            return 0
+        }
+
+        let referencedResolved = Set(referencedPaths.map {
+            URL(filePath: $0).resolvingSymlinksInPath().path(percentEncoded: false)
+        })
+
+        var deleted = 0
+        for url in entries {
+            let path = url.resolvingSymlinksInPath().path(percentEncoded: false)
+            if referencedResolved.contains(path) { continue }
+            if (try? fileManager.removeItem(at: url)) != nil { deleted += 1 }
+        }
+        return deleted
+    }
+
+    /// Prune orphaned Photos picker/shuffle cache files not referenced by a live
+    /// wallpaper. Safe to call from any actor.
+    static func pruneUnreferencedPhotosCaches(referencedPaths: Set<String>) {
+        pruneUnreferenced(directory: AppPaths.photosPickerCache, referencedPaths: referencedPaths)
+        pruneUnreferenced(directory: AppPaths.photosShuffleCache, referencedPaths: referencedPaths)
+    }
 }
