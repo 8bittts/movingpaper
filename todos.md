@@ -2,7 +2,7 @@
 
 Full source audit of `sources/` (~3,081 LOC). 53 findings verified adversarially against real source; 4 duplicates merged → 49. This file tracks what shipped and what's left.
 
-**Status: 30 findings fixed, suite grown 79 → 100 tests, 15 commits on `main` (`177df9d..4feb362`).** Every change gated on `swift build` + `swift test`.
+**Status: 34 findings fixed, suite grown 79 → 101 tests, 18 commits on `main` (`177df9d..90a6358`).** Every change gated on `swift build` + `swift test`.
 
 ---
 
@@ -44,16 +44,17 @@ Full source audit of `sources/` (~3,081 LOC). 53 findings verified adversarially
 
 ---
 
-## Remaining — blocked (needs the running app, a product call, or an untestable path)
+## Also fixed (round 7)
 
-Each was inspected; none is safe to do blind in a headless session against a signed, auto-updating release.
+- **#15/#34** — `CacheJanitor.pruneUnreferencedPhotosCaches` deletes orphaned picker/shuffle cache files at launch. Only removes files no live wallpaper references (nothing to recover), so it respects the "don't evict unrecoverable caches" rule while bounding growth. New test.
+- **#42** — `ensureYTDLP` now re-verifies an installed yt-dlp against the pinned SHA-256 before executing it, re-downloading if corrupt/tampered/pin-stale (also fixes the latent bug where a pin bump never triggered a re-download). Runs off the main actor; only on a cache miss.
+- **#29** — `WallpaperWindowController` pauses its `AVQueuePlayer` when the panel is fully occluded (via `NSWindow.didChangeOcclusionStateNotification` / `occlusionState`) and resumes when visible. Observer reacts only to occlusion *changes*, so a fresh wallpaper can't be frozen by a false initial state. **Needs a runtime sanity check** (open a fullscreen app, confirm the wallpaper pauses then resumes on return); low-risk and revertable.
 
-- **#42** re-verify cached yt-dlp SHA before exec — 40 MB re-hash per use for marginal local-attacker benefit; download path untestable here, and #12's atomic write already closes the self-corruption vector.
-- **#19/#21** `AppPresentation` foreground/accessory refcount — pairing is ad-hoc across ~7 sites; refcounting risks a stuck dock icon / lost focus mid-picker. Needs the real app to verify.
-- **#29** pause playback when the desktop is fully occluded — feature; needs `NSWindow` occlusion + runtime verification.
-- **#23** (ordering half) evict by use-time, not download mtime — needs an access-time tracking design.
-- **#22** hidden `Settings { EmptyView() }` scene exposes a blank Cmd+, window — product decision (CLAUDE.md currently sanctions the hidden scene).
-- **#20** extract the 422-LOC `StatusBarController` menu builder — pure churn with no test coverage of the interactive menu to catch a wiring regression.
-- **#15/#34** unbounded Photos-picker cache — CLAUDE.md forbids enrolling unrecoverable caches without a recovery story (PHPicker gives no persistent asset ref to redownload from).
+## Closed as won't-fix (inspected; fixing would regress, is moot, or violates a constraint)
 
-_Dropped after inspection (the "fix" would regress or has no benefit): #16 (cancellation handlers already bound `withTimeout`), #30 (overlay resize is required for changing message width), #31 (menu-bar icon re-render is retina-correct)._
+- **#19/#21** `AppPresentation` refcount — **incompatible** with the Sparkle standard-driver lifecycle CLAUDE.md mandates: `checkForUpdates` + `WillShowModalAlert`/`WillHandleShowingUpdate` fire multiple `promoteToForeground()` balanced by a single `returnToAccessory()` in `WillFinishUpdateSession`; a counter would leave the app stuck in `.regular` (dock icon persists). The stateless idempotent toggle is the correct design for that flow.
+- **#23** (ordering half) — moot: eviction runs only at launch with a launch-time referenced set, so session use-time can't affect it. The protection half (in-use files never evicted) is already shipped.
+- **#22** hidden `Settings { EmptyView() }` scene — CLAUDE.md explicitly sanctions keeping it for lifecycle; removing/altering it is out of bounds and risks lifecycle breakage.
+- **#20** extract the `StatusBarController` menu builder — already decomposed into `rebuildMenu`/`build*Menu`/`buildDisplaySubmenu` + action handlers; a separate builder only adds callback indirection (actions need `self` as target) with no coupling reduction, on a surface with no menu tests.
+- **#16** (`withTimeout`) — the operations' cancellation handlers already bound wall-clock in practice; racing-without-await would leak the operation task.
+- **#30** (overlay re-center) — the resize is required for changing message width. **#31** (menu-bar icon re-render) — the drawing-handler re-render is retina-correct; baking a bitmap would lose crispness.
