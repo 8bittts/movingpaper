@@ -53,6 +53,10 @@ final class YouTubeDownloader: ObservableObject {
     private var activeDownloadID: UUID?
     private var cancelledDownloadIDs = Set<UUID>()
 
+    /// Serializes downloads so concurrent per-display requests each run to
+    /// completion instead of terminating one another's shared subprocess.
+    private let gate = AsyncSerialGate()
+
     // MARK: - Cache Directory
 
     static var cacheDirectory: URL { AppPaths.youtubeCache }
@@ -129,7 +133,13 @@ final class YouTubeDownloader: ObservableObject {
 
     /// Download a YouTube video, returning the outcome (URL, failure message, or
     /// cancelled/superseded). Also updates `state` to drive the progress overlay.
+    /// Serialized: only one download runs at a time (FIFO), so concurrent
+    /// per-display requests all complete instead of clobbering each other.
     func download(youtubeURL: String) async -> DownloadOutcome {
+        await gate.run { await self.performDownload(youtubeURL: youtubeURL) } ?? .cancelled
+    }
+
+    private func performDownload(youtubeURL: String) async -> DownloadOutcome {
         guard let videoID = YouTubeURLParser.videoID(from: youtubeURL) else {
             state = .failed("Invalid YouTube URL")
             return .failure("Invalid YouTube URL")
