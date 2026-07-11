@@ -10,6 +10,23 @@ private extension Array where Element: Hashable {
     }
 }
 
+/// Thread-safe byte accumulator for draining a subprocess pipe incrementally so
+/// it can't fill its buffer and deadlock the child while it waits to be read.
+private final class DataAccumulator: @unchecked Sendable {
+    private let lock = NSLock()
+    private var data = Data()
+    func append(_ chunk: Data) {
+        lock.lock()
+        data.append(chunk)
+        lock.unlock()
+    }
+    var value: Data {
+        lock.lock()
+        defer { lock.unlock() }
+        return data
+    }
+}
+
 /// Downloads YouTube videos to local cache using bundled yt-dlp binary.
 @MainActor
 final class YouTubeDownloader: ObservableObject {
@@ -126,7 +143,8 @@ final class YouTubeDownloader: ObservableObject {
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
 
         let outputPath = cacheDir.appendingPathComponent("\(videoID).mp4").path(percentEncoded: false)
-        let partialPath = cacheDir.appendingPathComponent("\(videoID).part").path(percentEncoded: false)
+        // yt-dlp writes the in-progress file as "<output>.part", i.e. "<videoID>.mp4.part".
+        let partialPath = cacheDir.appendingPathComponent("\(videoID).mp4.part").path(percentEncoded: false)
 
         if process != nil {
             cancel()
@@ -213,6 +231,9 @@ final class YouTubeDownloader: ObservableObject {
         case cancelled
     }
 
+    /// Compiled once, not per stdout chunk. Matches yt-dlp progress like "45.2%".
+    private nonisolated static let progressRegex = try! NSRegularExpression(pattern: #"(\d+\.\d+)%"#)
+
     private func runYTDLP(binary: String, downloadID: UUID, arguments: [String]) async -> DownloadResult {
         await withTaskCancellationHandler {
             await runYTDLPSubprocess(binary: binary, downloadID: downloadID, arguments: arguments)
@@ -235,26 +256,37 @@ final class YouTubeDownloader: ObservableObject {
 
             self.process = proc
 
+            // Drain stderr continuously; otherwise a chatty yt-dlp run can fill the
+            // pipe buffer and block the child while we wait for it to exit.
+            let errAccumulator = DataAccumulator()
+            errPipe.fileHandleForReading.readabilityHandler = { handle in
+                let chunk = handle.availableData
+                if !chunk.isEmpty { errAccumulator.append(chunk) }
+            }
+
             // Read output on background thread, dispatch progress to MainActor
             pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
                 let data = handle.availableData
                 guard !data.isEmpty, let line = String(data: data, encoding: .utf8) else { return }
 
                 // Parse yt-dlp progress lines like "[download]  45.2% of ~12.34MiB"
-                if let range = line.range(of: #"\d+\.\d+%"#, options: .regularExpression) {
-                    let percentStr = line[range].dropLast() // remove %
-                    if let percent = Double(percentStr) {
-                        Task { @MainActor [weak self] in
-                            guard self?.activeDownloadID == downloadID else { return }
-                            self?.state = .downloading(progress: percent / 100.0)
-                        }
+                let nsLine = line as NSString
+                let match = Self.progressRegex.firstMatch(
+                    in: line, range: NSRange(location: 0, length: nsLine.length)
+                )
+                if let match, match.numberOfRanges > 1,
+                   let percent = Double(nsLine.substring(with: match.range(at: 1))) {
+                    Task { @MainActor [weak self] in
+                        guard self?.activeDownloadID == downloadID else { return }
+                        self?.state = .downloading(progress: percent / 100.0)
                     }
                 }
             }
 
             proc.terminationHandler = { proc in
                 pipe.fileHandleForReading.readabilityHandler = nil
-                let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+                errPipe.fileHandleForReading.readabilityHandler = nil
+                let errData = errAccumulator.value + errPipe.fileHandleForReading.readDataToEndOfFile()
                 pipe.fileHandleForReading.closeFile()
                 errPipe.fileHandleForReading.closeFile()
 
