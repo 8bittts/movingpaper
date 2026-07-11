@@ -92,8 +92,11 @@ extension PhotosPickerController: PHPickerViewControllerDelegate {
                 let ext = tempURL.pathExtension
                 let name = UUID().uuidString + (ext.isEmpty ? "" : ".\(ext)")
                 let dest = cacheDir.appendingPathComponent(name)
-                try? FileManager.default.copyItem(at: tempURL, to: dest)
-                cachedURL = dest
+                // Only hand back a URL if the copy actually landed a file — otherwise
+                // the caller would try to render a path that doesn't exist.
+                if (try? FileManager.default.copyItem(at: tempURL, to: dest)) != nil {
+                    cachedURL = dest
+                }
             }
             Task { @MainActor in self.finish(with: cachedURL) }
         }

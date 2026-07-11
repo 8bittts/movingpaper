@@ -6,6 +6,8 @@ import Photos
 final class PhotosService: Sendable {
 
     func requestAccess() async -> Bool {
+        // `.readWrite` is the minimal access level that can read the library —
+        // PHAccessLevel offers only `.addOnly` and `.readWrite`, no read-only level.
         let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         if status == .authorized || status == .limited { return true }
         let newStatus = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
