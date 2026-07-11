@@ -56,7 +56,7 @@ final class YouTubeDownloader: ObservableObject {
     // MARK: - yt-dlp Binary
 
     /// Path to the yt-dlp binary. Checks Application Support first, then dev tools/.
-    private static var ytdlpPath: String? {
+    private nonisolated static var ytdlpPath: String? {
         let installed = AppPaths.ytdlpBinary.path(percentEncoded: false)
         if FileManager.default.fileExists(atPath: installed) {
             return installed
@@ -78,7 +78,8 @@ final class YouTubeDownloader: ObservableObject {
 
     /// Download yt-dlp if not already installed. Returns path on success.
     /// Verifies the downloaded binary against the pinned SHA-256 before installing.
-    static func ensureYTDLP() async -> String? {
+    /// `nonisolated` so the 40 MB hash + write run off the main actor.
+    nonisolated static func ensureYTDLP() async -> String? {
         if let existing = ytdlpPath { return existing }
 
         let installURL = AppPaths.ytdlpBinary
@@ -97,7 +98,9 @@ final class YouTubeDownloader: ObservableObject {
                 Log.youtube.error("yt-dlp SHA-256 mismatch for pinned version \(pinnedYTDLPVersion, privacy: .public); refusing to install")
                 return nil
             }
-            try data.write(to: installURL)
+            // Atomic write: a crash/disk-full mid-write can't leave a truncated,
+            // permanently-poisoned binary that the existence-only path check trusts.
+            try data.write(to: installURL, options: .atomic)
             try FileManager.default.setAttributes(
                 [.posixPermissions: 0o755],
                 ofItemAtPath: installURL.path(percentEncoded: false)
