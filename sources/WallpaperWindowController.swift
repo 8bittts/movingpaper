@@ -33,6 +33,9 @@ final class WallpaperWindowController {
 
     func reposition(to newScreen: NSScreen) {
         self.screen = newScreen
+        // Skip the (potentially display-forcing) reframe when nothing moved —
+        // reconcile() calls this on every rebuild, including space switches.
+        guard panel.frame != newScreen.frame else { return }
         panel.setFrame(newScreen.frame, display: true)
     }
 

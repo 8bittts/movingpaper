@@ -178,10 +178,19 @@ final class WallpaperManager {
             let entry = WallpaperEntry(localURL: url, youtubeOrigin: youtubeOrigin)
             state.applyShared(entry: entry, across: connectedDisplayIDs)
         case .perDesktop:
+            let entry = WallpaperEntry(localURL: url, youtubeOrigin: youtubeOrigin)
             if let id = displayID {
                 let space = spaceID ?? currentSpaceID(for: id)
-                let key = DesktopKey(displayID: id, spaceID: space)
-                state.setEntry(WallpaperEntry(localURL: url, youtubeOrigin: youtubeOrigin), for: key)
+                state.setEntry(entry, for: DesktopKey(displayID: id, spaceID: space))
+            } else {
+                // A "for all" pick that resolves while in perDesktop mode (e.g. the
+                // picker opened in allDesktops, then the user switched modes): apply
+                // to every connected display on its current space rather than
+                // silently dropping the chosen media.
+                for displayID in connectedDisplayIDs {
+                    let key = DesktopKey(displayID: displayID, spaceID: currentSpaceID(for: displayID))
+                    state.setEntry(entry, for: key)
+                }
             }
         }
 

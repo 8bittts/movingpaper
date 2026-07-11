@@ -22,6 +22,9 @@ final class StatusBarController: NSObject {
             button.image = icon
         }
         let menu = NSMenu()
+        // Manage enabled state ourselves; otherwise AppKit auto-enables any item
+        // with a valid target/action, overriding e.g. the Check-for-Updates gate.
+        menu.autoenablesItems = false
         menu.delegate = self
         item.menu = menu
         self.statusItem = item
