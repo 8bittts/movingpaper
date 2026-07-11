@@ -100,12 +100,13 @@ final class WallpaperManager {
 
     /// All known Spaces for a display, sorted by space ID.
     /// Includes Spaces with and without wallpapers — we track every Space the user visits.
-    func spaceAssignments(for displayID: CGDirectDisplayID) -> [(spaceID: UInt64, fileName: String, isCurrent: Bool)] {
+    func spaceAssignments(for displayID: CGDirectDisplayID) -> [(spaceID: UInt64, fileName: String?, isCurrent: Bool)] {
         let spaces = state.knownSpaces[displayID] ?? []
         let currentSpace = currentSpaceID(for: displayID)
         return spaces.sorted().map { spaceID in
             let key = DesktopKey(displayID: displayID, spaceID: spaceID)
-            let fileName = state.localURL(for: key)?.lastPathComponent ?? "No MovingPaper"
+            // nil means no wallpaper on this Space — the UI supplies the label.
+            let fileName = state.localURL(for: key)?.lastPathComponent
             return (spaceID: spaceID, fileName: fileName, isCurrent: spaceID == currentSpace)
         }
     }

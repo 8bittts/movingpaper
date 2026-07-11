@@ -231,10 +231,10 @@ final class StatusBarController: NSObject {
             let spaces = wallpaperManager.spaceAssignments(for: display.id)
 
             for (index, space) in spaces.enumerated() {
-                let hasWallpaper = space.fileName != "No MovingPaper"
+                let hasWallpaper = space.fileName != nil
                 let label = MenuBarLabelFormatter.desktopWallpaperTitle(
                     index: index + 1,
-                    fileName: space.fileName
+                    fileName: space.fileName ?? "No MovingPaper"
                 )
                 let item = NSMenuItem(title: label, action: nil, keyEquivalent: "")
                 if space.isCurrent {
@@ -372,18 +372,15 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func chooseFromPhotosForAll() {
-        AppPresentation.promoteToForeground()
-        Task {
-            defer { AppPresentation.returnToAccessory() }
-            let picker = PhotosPickerController()
-            let url = await picker.run()
-            guard let url else { return }
-            wallpaperManager.setWallpaper(url: url)
-        }
+        presentPhotosPicker(for: nil)
     }
 
     @objc private func chooseFromPhotosForDisplay(_ sender: NSMenuItem) {
-        let displayID = CGDirectDisplayID(sender.tag)
+        presentPhotosPicker(for: CGDirectDisplayID(sender.tag))
+    }
+
+    /// Foreground the app, run the Photos picker, and assign the pick (nil display = all).
+    private func presentPhotosPicker(for displayID: CGDirectDisplayID?) {
         AppPresentation.promoteToForeground()
         Task {
             defer { AppPresentation.returnToAccessory() }
