@@ -114,6 +114,12 @@ final class WallpaperManager {
     /// Whether any desktop has a wallpaper assigned.
     var hasAnyWallpaper: Bool { !state.isEmpty }
 
+    /// Local file paths currently referenced by live wallpaper assignments.
+    /// Used to protect in-use cache files from eviction by `CacheJanitor`.
+    var referencedLocalPaths: Set<String> {
+        Set(state.entries.values.map { $0.localURL.path(percentEncoded: false) })
+    }
+
     // MARK: - File Selection
 
     private func assignmentTarget(for displayID: CGDirectDisplayID?) -> WallpaperAssignmentTarget {

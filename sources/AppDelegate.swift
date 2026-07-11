@@ -11,16 +11,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AppIdentityDefaultsMigration.migrateIfNeeded()
         installApplicationIcon()
 
-        // Evict stale cache entries off the main path; safe to drop if cancelled.
-        Task.detached(priority: .utility) {
-            CacheJanitor.enforceDefaultPolicies()
-        }
-
         // Menu bar only — no Dock icon, no Cmd+Tab entry
         AppPresentation.returnToAccessory()
 
         let manager = WallpaperManager()
         self.wallpaperManager = manager
+
+        // Evict stale cache entries off the main path; safe to drop if cancelled.
+        // Protect files the restored wallpapers still reference so an eviction
+        // can't blank a live desktop.
+        let protectedPaths = manager.referencedLocalPaths
+        Task.detached(priority: .utility) {
+            CacheJanitor.enforceDefaultPolicies(protecting: protectedPaths)
+        }
 
         let sparkleUpdater = MovingPaperUpdater()
         self.updater = sparkleUpdater

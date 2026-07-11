@@ -22,6 +22,7 @@ enum CacheJanitor {
     static func enforceBudget(
         directory: URL,
         budgetBytes: Int64,
+        protectedPaths: Set<String> = [],
         fileManager: FileManager = .default
     ) -> Int {
         guard let entries = try? fileManager.contentsOfDirectory(
@@ -49,12 +50,21 @@ enum CacheJanitor {
         let totalSize = candidates.reduce(Int64(0)) { $0 + $1.size }
         guard totalSize > budgetBytes else { return 0 }
 
+        // Resolve symlinks so protection matches regardless of how the path was
+        // spelled (e.g. /var vs /private/var).
+        let protectedResolved = Set(protectedPaths.map {
+            URL(filePath: $0).resolvingSymlinksInPath().path(percentEncoded: false)
+        })
+
         // Oldest first — those are the most likely to be unused.
         let sorted = candidates.sorted { $0.modified < $1.modified }
         var remaining = totalSize
         var deleted = 0
 
         for candidate in sorted where remaining > budgetBytes {
+            // Never evict a file that is currently referenced by a live wallpaper —
+            // dropping it would blank the desktop until the next launch redownload.
+            if protectedResolved.contains(candidate.url.resolvingSymlinksInPath().path(percentEncoded: false)) { continue }
             do {
                 try fileManager.removeItem(at: candidate.url)
                 remaining -= candidate.size
@@ -69,10 +79,12 @@ enum CacheJanitor {
     }
 
     /// Apply the default YouTube cache policy. Safe to call from any actor.
-    static func enforceDefaultPolicies() {
+    /// `protectedPaths` are cache files currently referenced by live wallpapers.
+    static func enforceDefaultPolicies(protecting protectedPaths: Set<String> = []) {
         enforceBudget(
             directory: AppPaths.youtubeCache,
-            budgetBytes: defaultYouTubeBudgetBytes
+            budgetBytes: defaultYouTubeBudgetBytes,
+            protectedPaths: protectedPaths
         )
     }
 }

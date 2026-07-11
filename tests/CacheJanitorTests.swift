@@ -63,6 +63,25 @@ struct CacheJanitorTests {
         #expect(FileManager.default.fileExists(atPath: fixture.path(for: "newest.mp4")))
     }
 
+    @Test func neverEvictsProtectedFilesEvenWhenOldestAndOverBudget() throws {
+        let fixture = try CacheFixture()
+        defer { fixture.cleanup() }
+
+        try fixture.write(name: "in-use.mp4", size: 600, modified: -2_000)   // oldest
+        try fixture.write(name: "stale.mp4", size: 600, modified: -100)
+
+        // 1200 total, budget 800. Oldest is in-use → must evict the newer stale file instead.
+        let deleted = CacheJanitor.enforceBudget(
+            directory: fixture.directory,
+            budgetBytes: 800,
+            protectedPaths: [fixture.path(for: "in-use.mp4")]
+        )
+
+        #expect(deleted == 1)
+        #expect(FileManager.default.fileExists(atPath: fixture.path(for: "in-use.mp4")))
+        #expect(!FileManager.default.fileExists(atPath: fixture.path(for: "stale.mp4")))
+    }
+
     @Test func missingDirectoryIsHandledGracefully() {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("MovingPaperTests-missing-\(UUID().uuidString)", isDirectory: true)
