@@ -64,8 +64,71 @@ struct WallpaperPersistenceStoreTests {
         #expect(loaded.state.entries.isEmpty)
         #expect(loaded.state.knownSpaces[7] == Set([3]))
         #expect(loaded.needsRedownload == [
-            WallpaperRedownloadRequest(key: key, youtubeURL: "https://youtu.be/dQw4w9WgXcQ"),
+            WallpaperRedownloadRequest(
+                key: key,
+                youtubeURL: "https://youtu.be/dQw4w9WgXcQ",
+                localURL: URL(filePath: missingPath)
+            ),
         ])
+    }
+
+    @Test func saveRePersistsPendingRedownloadsSoTheySurviveUnrelatedSaves() throws {
+        let defaults = try temporaryDefaults()
+        defer { defaults.cleanup() }
+
+        let missingPath = defaults.directory.appendingPathComponent("gone.mp4").path(percentEncoded: false)
+        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults)
+        defaults.userDefaults.set(
+            [[
+                "displayID": NSNumber(value: CGDirectDisplayID(7)),
+                "spaceID": NSNumber(value: UInt64(3)),
+                "path": missingPath,
+                "youtubeURL": "https://youtu.be/dQw4w9WgXcQ",
+            ]],
+            forKey: "desktopFiles"
+        )
+
+        // Launch: the missing YouTube-backed file is queued for redownload.
+        let loaded = store.load()
+        #expect(loaded.needsRedownload.count == 1)
+
+        // An unrelated save (e.g. toggling mute) happens before the redownload
+        // finishes. The pending record must survive, not be erased.
+        store.save(
+            mode: loaded.mode,
+            isMuted: false,
+            state: loaded.state,
+            pendingRedownloads: loaded.needsRedownload
+        )
+
+        let reloaded = store.load()
+        #expect(reloaded.needsRedownload == loaded.needsRedownload)
+    }
+
+    @Test func saveDoesNotReemitPendingForKeysNowAssigned() throws {
+        let defaults = try temporaryDefaults()
+        defer { defaults.cleanup() }
+
+        let realURL = defaults.directory.appendingPathComponent("resolved.mp4")
+        FileManager.default.createFile(atPath: realURL.path(percentEncoded: false), contents: Data())
+        let key = DesktopKey(displayID: 7, spaceID: 3)
+        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults)
+
+        // The redownload has resolved: the key now has a real entry.
+        var state = WallpaperState()
+        state.setEntry(WallpaperEntry(localURL: realURL, youtubeOrigin: "https://youtu.be/x"), for: key)
+        let stalePending = WallpaperRedownloadRequest(
+            key: key,
+            youtubeURL: "https://youtu.be/x",
+            localURL: URL(filePath: "/missing.mp4")
+        )
+
+        store.save(mode: .perDesktop, isMuted: true, state: state, pendingRedownloads: [stalePending])
+
+        let reloaded = store.load()
+        // The resolved entry loads; the stale pending record for the same key is dropped.
+        #expect(reloaded.state.entries == [key: WallpaperEntry(localURL: realURL, youtubeOrigin: "https://youtu.be/x")])
+        #expect(reloaded.needsRedownload.isEmpty)
     }
 
     @Test func defaultsMissingModeAndMuteToCurrentBehavior() throws {

@@ -4,6 +4,9 @@ import Foundation
 struct WallpaperRedownloadRequest: Equatable {
     let key: DesktopKey
     let youtubeURL: String
+    /// The persisted cache path this YouTube video should occupy once redownloaded.
+    /// Kept so an in-flight request can be re-persisted verbatim across saves.
+    let localURL: URL
 }
 
 struct WallpaperPersistedState: Equatable {
@@ -57,8 +60,13 @@ struct WallpaperPersistenceStore {
         userDefaults.set(Self.currentSchemaVersion, forKey: Defaults.schemaVersion)
     }
 
-    func save(mode: WallpaperMode, isMuted: Bool, state: WallpaperState) {
-        let encoded: [[String: Any]] = state.entries.map { key, entry in
+    func save(
+        mode: WallpaperMode,
+        isMuted: Bool,
+        state: WallpaperState,
+        pendingRedownloads: [WallpaperRedownloadRequest] = []
+    ) {
+        var encoded: [[String: Any]] = state.entries.map { key, entry in
             var record: [String: Any] = [
                 "displayID": NSNumber(value: key.displayID),
                 "spaceID": NSNumber(value: key.spaceID),
@@ -68,6 +76,18 @@ struct WallpaperPersistenceStore {
                 record["youtubeURL"] = youtubeURL
             }
             return record
+        }
+
+        // Re-emit still-pending YouTube redownloads (cache file missing, not yet
+        // resolved) so an unrelated save during the redownload window doesn't
+        // erase them. Skip any key the user has since assigned directly.
+        for request in pendingRedownloads where state.entries[request.key] == nil {
+            encoded.append([
+                "displayID": NSNumber(value: request.key.displayID),
+                "spaceID": NSNumber(value: request.key.spaceID),
+                "path": request.localURL.path(percentEncoded: false),
+                "youtubeURL": request.youtubeURL,
+            ])
         }
 
         userDefaults.set(encoded, forKey: Defaults.desktopFiles)
@@ -114,7 +134,9 @@ struct WallpaperPersistenceStore {
                     youtubeOrigin: youtubeURL
                 )
             } else if let youtubeURL {
-                persisted.needsRedownload.append(WallpaperRedownloadRequest(key: key, youtubeURL: youtubeURL))
+                persisted.needsRedownload.append(
+                    WallpaperRedownloadRequest(key: key, youtubeURL: youtubeURL, localURL: URL(filePath: path))
+                )
             }
         }
 

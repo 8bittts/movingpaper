@@ -39,6 +39,10 @@ final class WallpaperManager {
     private let requestCoordinator = WallpaperRequestCoordinator()
     private let persistenceStore = WallpaperPersistenceStore()
     private var restoreTask: Task<Void, Never>?
+    /// YouTube redownloads still outstanding this session, keyed by desktop.
+    /// Re-persisted on every save so an unrelated save can't erase them before
+    /// the download finishes; dropped when resolved or the desktop is cleared.
+    private var pendingRedownloads: [DesktopKey: WallpaperRedownloadRequest] = [:]
     private(set) var activeSpaceIDs: [CGDirectDisplayID: UInt64] = [:]
 
     init() {
@@ -269,6 +273,7 @@ final class WallpaperManager {
     /// Remove wallpaper from a specific display (current space in perDesktop mode).
     func clearWallpaper(for displayID: CGDirectDisplayID) {
         cancelAssignment(for: .display(displayID))
+        pendingRedownloads[desktopKey(for: displayID)] = nil
         state.clearEntry(for: desktopKey(for: displayID))
         router.closeController(for: displayID)
         saveState()
@@ -278,6 +283,7 @@ final class WallpaperManager {
     func clearAllWallpapers() {
         cancelAllAssignments()
         cancelRestoreTask()
+        pendingRedownloads.removeAll()
         state.entries.removeAll()
         state.playbackPositions.removeAll()
         tearDownWindows()
@@ -343,7 +349,12 @@ final class WallpaperManager {
     // MARK: - Persistence
 
     private func saveState() {
-        persistenceStore.save(mode: mode, isMuted: isMuted, state: state)
+        persistenceStore.save(
+            mode: mode,
+            isMuted: isMuted,
+            state: state,
+            pendingRedownloads: Array(pendingRedownloads.values)
+        )
     }
 
     private func restoreState() {
@@ -352,6 +363,9 @@ final class WallpaperManager {
         isMuted = persisted.isMuted
         state.adopt(persisted: persisted.state)
 
+        for request in persisted.needsRedownload {
+            pendingRedownloads[request.key] = request
+        }
         scheduleRestoreRedownloads(persisted.needsRedownload)
 
         if !state.isEmpty {
@@ -385,6 +399,7 @@ final class WallpaperManager {
                     WallpaperEntry(localURL: localURL, youtubeOrigin: youtubeURL),
                     for: key
                 )
+                pendingRedownloads[key] = nil
                 saveState()
                 rebuildAllWindows()
             }
