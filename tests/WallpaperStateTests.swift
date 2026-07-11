@@ -17,6 +17,25 @@ struct WallpaperStateTests {
         #expect(state.knownSpaces[displayA] == Set([5]))
     }
 
+    @Test func canonicalEntryIsDeterministicByDisplayThenSpace() {
+        let entryLow = WallpaperEntry(localURL: URL(filePath: "/low.mp4"), youtubeOrigin: nil)
+        let entryHigh = WallpaperEntry(localURL: URL(filePath: "/high.mp4"), youtubeOrigin: nil)
+
+        // Insert in "high then low" order; canonical must still pick the lowest key.
+        var state = WallpaperState()
+        state.setEntry(entryHigh, for: DesktopKey(displayID: displayB, spaceID: 5))
+        state.setEntry(entryLow, for: DesktopKey(displayID: displayA, spaceID: 9))
+        #expect(state.canonicalEntry == entryLow)
+
+        // Same display, tie broken by the lower spaceID.
+        var tie = WallpaperState()
+        tie.setEntry(entryHigh, for: DesktopKey(displayID: displayA, spaceID: 20))
+        tie.setEntry(entryLow, for: DesktopKey(displayID: displayA, spaceID: 3))
+        #expect(tie.canonicalEntry == entryLow)
+
+        #expect(WallpaperState().canonicalEntry == nil)
+    }
+
     @Test func clearEntryRemovesEntryAndPlaybackPosition() {
         var state = WallpaperState()
         let key = DesktopKey(displayID: displayA, spaceID: 5)

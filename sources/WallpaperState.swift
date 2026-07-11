@@ -23,8 +23,18 @@ struct WallpaperState: Equatable {
 
     func localURL(for key: DesktopKey) -> URL? { entries[key]?.localURL }
 
+    /// The entry with the smallest `DesktopKey`, chosen deterministically so that
+    /// collapsing differing per-desktop assignments to one shared wallpaper always
+    /// picks the same one (dictionary order is otherwise arbitrary). In
+    /// `.allDesktops` mode every entry is identical, so this is stable there too.
+    var canonicalEntry: WallpaperEntry? {
+        entries.min {
+            ($0.key.displayID, $0.key.spaceID) < ($1.key.displayID, $1.key.spaceID)
+        }?.value
+    }
+
     /// The single shared URL when all desktops share one wallpaper, or `nil`.
-    var sharedLocalURL: URL? { entries.values.first?.localURL }
+    var sharedLocalURL: URL? { canonicalEntry?.localURL }
 
     mutating func setEntry(_ entry: WallpaperEntry, for key: DesktopKey) {
         entries[key] = entry
@@ -62,7 +72,7 @@ struct WallpaperState: Equatable {
     /// shared value (if any) to every connected display.
     @discardableResult
     mutating func reconcileAllDesktops(connectedDisplayIDs: [CGDirectDisplayID]) -> Bool {
-        guard let shared = entries.values.first else { return false }
+        guard let shared = canonicalEntry else { return false }
         let expected = Set(connectedDisplayIDs.map(DesktopKey.init(displayID:)))
         var changed = false
 

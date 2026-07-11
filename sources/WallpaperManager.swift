@@ -306,7 +306,7 @@ final class WallpaperManager {
 
         switch newMode {
         case .allDesktops:
-            if let shared = state.entries.values.first {
+            if let shared = state.canonicalEntry {
                 state.applyShared(entry: shared, across: connectedDisplayIDs)
             }
         case .perDesktop:
