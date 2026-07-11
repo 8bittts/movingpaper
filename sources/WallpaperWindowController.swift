@@ -30,13 +30,21 @@ final class WallpaperWindowController {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, let player = self.player else { return }
-                if self.panel.occlusionState.contains(.visible) {
-                    player.play()
-                } else {
-                    player.pause()
-                }
+                guard let self else { return }
+                Self.applyOcclusion(isVisible: self.panel.occlusionState.contains(.visible), to: self.player)
             }
+        }
+    }
+
+    /// Resume the player when any part of the wallpaper is visible; pause it when
+    /// fully hidden. Split out (and given the player explicitly) so the play/pause
+    /// wiring is unit-testable without the window server.
+    static func applyOcclusion(isVisible: Bool, to player: AVQueuePlayer?) {
+        guard let player else { return }
+        if isVisible {
+            player.play()
+        } else {
+            player.pause()
         }
     }
 
