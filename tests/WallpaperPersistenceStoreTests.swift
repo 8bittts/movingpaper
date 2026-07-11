@@ -92,6 +92,58 @@ struct WallpaperPersistenceStoreTests {
         )
     }
 
+    @Test func dropsMissingLocalFileWithNoYouTubeOrigin() throws {
+        let defaults = try temporaryDefaults()
+        defer { defaults.cleanup() }
+
+        let missingPath = defaults.directory.appendingPathComponent("gone.mp4").path(percentEncoded: false)
+        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults)
+        defaults.userDefaults.set(
+            [[
+                "displayID": NSNumber(value: CGDirectDisplayID(5)),
+                "spaceID": NSNumber(value: UInt64(9)),
+                "path": missingPath,
+            ]],
+            forKey: "desktopFiles"
+        )
+
+        let loaded = store.load()
+        // No local file and no youtubeURL → assignment dropped, Space still remembered.
+        #expect(loaded.state.entries.isEmpty)
+        #expect(loaded.needsRedownload.isEmpty)
+        #expect(loaded.state.knownSpaces[5] == Set([9]))
+    }
+
+    @Test func skipsMalformedRecordsButLoadsValidOnes() throws {
+        let defaults = try temporaryDefaults()
+        defer { defaults.cleanup() }
+
+        let goodURL = defaults.directory.appendingPathComponent("good.mp4")
+        FileManager.default.createFile(atPath: goodURL.path(percentEncoded: false), contents: Data())
+        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults)
+        defaults.userDefaults.set(
+            [
+                // Malformed: missing "path" → skipped via `guard ... else { continue }`.
+                [
+                    "displayID": NSNumber(value: CGDirectDisplayID(1)),
+                    "spaceID": NSNumber(value: UInt64(0)),
+                ],
+                // Valid record loads normally.
+                [
+                    "displayID": NSNumber(value: CGDirectDisplayID(2)),
+                    "spaceID": NSNumber(value: UInt64(0)),
+                    "path": goodURL.path(percentEncoded: false),
+                ],
+            ],
+            forKey: "desktopFiles"
+        )
+
+        let loaded = store.load()
+        #expect(loaded.state.entries == [
+            DesktopKey(displayID: 2, spaceID: 0): WallpaperEntry(localURL: goodURL, youtubeOrigin: nil),
+        ])
+    }
+
     private func temporaryDefaults() throws -> TemporaryDefaults {
         let suiteName = "MovingPaperTests.\(UUID().uuidString)"
         guard let userDefaults = UserDefaults(suiteName: suiteName) else {

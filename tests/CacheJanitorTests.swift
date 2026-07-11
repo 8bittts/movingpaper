@@ -33,6 +33,36 @@ struct CacheJanitorTests {
         #expect(FileManager.default.fileExists(atPath: fixture.path(for: "b.mp4")))
     }
 
+    @Test func noEvictionWhenTotalEqualsBudget() throws {
+        let fixture = try CacheFixture()
+        defer { fixture.cleanup() }
+
+        try fixture.write(name: "a.mp4", size: 500, modified: -200)
+        try fixture.write(name: "b.mp4", size: 500, modified: -100)
+
+        // totalSize == budget → the `totalSize > budgetBytes` guard must not evict.
+        let deleted = CacheJanitor.enforceBudget(directory: fixture.directory, budgetBytes: 1_000)
+        #expect(deleted == 0)
+        #expect(FileManager.default.fileExists(atPath: fixture.path(for: "a.mp4")))
+        #expect(FileManager.default.fileExists(atPath: fixture.path(for: "b.mp4")))
+    }
+
+    @Test func evictsMultipleFilesUntilUnderBudget() throws {
+        let fixture = try CacheFixture()
+        defer { fixture.cleanup() }
+
+        try fixture.write(name: "oldest.mp4", size: 400, modified: -3_000)
+        try fixture.write(name: "older.mp4", size: 400, modified: -2_000)
+        try fixture.write(name: "newest.mp4", size: 400, modified: -1_000)
+
+        // 1200 total, budget 500 → evict the two oldest, leaving 400.
+        let deleted = CacheJanitor.enforceBudget(directory: fixture.directory, budgetBytes: 500)
+        #expect(deleted == 2)
+        #expect(!FileManager.default.fileExists(atPath: fixture.path(for: "oldest.mp4")))
+        #expect(!FileManager.default.fileExists(atPath: fixture.path(for: "older.mp4")))
+        #expect(FileManager.default.fileExists(atPath: fixture.path(for: "newest.mp4")))
+    }
+
     @Test func missingDirectoryIsHandledGracefully() {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("MovingPaperTests-missing-\(UUID().uuidString)", isDirectory: true)
