@@ -17,6 +17,17 @@ struct WallpaperStateTests {
         #expect(state.knownSpaces[displayA] == Set([5]))
     }
 
+    @Test func setEntryIgnoresTheAllDesktopsSentinelSpace() {
+        var state = WallpaperState()
+        // DesktopKey(displayID:) uses spaceID 0, the all-desktops sentinel.
+        let key = DesktopKey(displayID: displayA)
+        state.setEntry(WallpaperEntry(localURL: localURL, youtubeOrigin: nil), for: key)
+        #expect(state.entries[key]?.localURL == localURL)
+        // spaceID 0 must not be recorded as a known Space, or a phantom "Desktop 1"
+        // row appears in the Per Desktop menu after an all-desktops assignment.
+        #expect(state.knownSpaces[displayA] == nil)
+    }
+
     @Test func canonicalEntryIsDeterministicByDisplayThenSpace() {
         let entryLow = WallpaperEntry(localURL: URL(filePath: "/low.mp4"), youtubeOrigin: nil)
         let entryHigh = WallpaperEntry(localURL: URL(filePath: "/high.mp4"), youtubeOrigin: nil)

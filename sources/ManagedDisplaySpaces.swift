@@ -30,11 +30,14 @@ struct ManagedDisplaySpacesSnapshot: Equatable {
         screensByDisplayIdentifier: [String: CGDirectDisplayID],
         fallbackGlobalSpaceID: UInt64
     ) -> ManagedDisplaySpacesSnapshot {
+        // Collapse (never trap) if two identifiers resolve to the same displayID.
         var activeSpaceByDisplayID = Dictionary(
-            uniqueKeysWithValues: screensByDisplayIdentifier.values.map { ($0, fallbackGlobalSpaceID) }
+            screensByDisplayIdentifier.values.map { ($0, fallbackGlobalSpaceID) },
+            uniquingKeysWith: { first, _ in first }
         )
         var knownSpacesByDisplayID = Dictionary(
-            uniqueKeysWithValues: screensByDisplayIdentifier.values.map { ($0, Set<UInt64>()) }
+            screensByDisplayIdentifier.values.map { ($0, Set<UInt64>()) },
+            uniquingKeysWith: { first, _ in first }
         )
 
         for entry in rawEntries {
@@ -74,7 +77,7 @@ struct ManagedDisplaySpacesSnapshot: Equatable {
 
     private static func displayIdentifiers(for screens: [NSScreen]) -> [String: CGDirectDisplayID] {
         Dictionary(
-            uniqueKeysWithValues: screens.compactMap { screen in
+            screens.compactMap { screen -> (String, CGDirectDisplayID)? in
                 guard
                     let displayID = screen.displayID,
                     let uuid = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue()
@@ -84,7 +87,9 @@ struct ManagedDisplaySpacesSnapshot: Equatable {
 
                 let identifier = CFUUIDCreateString(nil, uuid) as String
                 return (identifier, displayID)
-            }
+            },
+            // Two screens reporting the same display UUID would otherwise trap.
+            uniquingKeysWith: { first, _ in first }
         )
     }
 

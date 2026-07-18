@@ -67,6 +67,22 @@ final class YouTubeDownloader: ObservableObject {
         return FileManager.default.fileExists(atPath: path.path(percentEncoded: false)) ? path : nil
     }
 
+    /// Remove every cache file yt-dlp may have written for this video — the merged
+    /// output, its `.part`, the per-format `<id>.f*.mp4/.m4a` streams (and their
+    /// `.part`s), and the `.ytdl` state file — so a cancelled or failed run doesn't
+    /// orphan intermediates. Scoped to names beginning with "<videoID>." so it never
+    /// touches another video's cached file.
+    private static func cleanupIntermediates(videoID: String, in cacheDir: URL) {
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(
+            at: cacheDir, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
+        ) else { return }
+        let prefix = "\(videoID)."
+        for entry in entries where entry.lastPathComponent.hasPrefix(prefix) {
+            try? fm.removeItem(at: entry)
+        }
+    }
+
     // MARK: - yt-dlp Binary
 
     /// Pinned yt-dlp release. Bump both fields together — the SHA-256 is checked
@@ -172,8 +188,6 @@ final class YouTubeDownloader: ObservableObject {
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
 
         let outputPath = cacheDir.appendingPathComponent("\(videoID).mp4").path(percentEncoded: false)
-        // yt-dlp writes the in-progress file as "<output>.part", i.e. "<videoID>.mp4.part".
-        let partialPath = cacheDir.appendingPathComponent("\(videoID).mp4.part").path(percentEncoded: false)
 
         if process != nil {
             cancel()
@@ -192,13 +206,17 @@ final class YouTubeDownloader: ObservableObject {
                 "--no-playlist",
                 "--newline",
                 "--progress",
+                // Bound network stalls so a hung connection self-terminates instead
+                // of wedging the serial download gate indefinitely.
+                "--socket-timeout", "30",
+                "--retries", "3",
                 "-o", outputPath,
                 youtubeURL,
             ]
         )
 
         guard activeDownloadID == downloadID else {
-            try? FileManager.default.removeItem(atPath: partialPath)
+            Self.cleanupIntermediates(videoID: videoID, in: cacheDir)
             return .cancelled
         }
 
@@ -207,11 +225,10 @@ final class YouTubeDownloader: ObservableObject {
         switch result {
         case .cancelled:
             state = .idle
-            try? FileManager.default.removeItem(atPath: partialPath)
+            Self.cleanupIntermediates(videoID: videoID, in: cacheDir)
             return .cancelled
         case .failed(let message):
-            try? FileManager.default.removeItem(atPath: outputPath)
-            try? FileManager.default.removeItem(atPath: partialPath)
+            Self.cleanupIntermediates(videoID: videoID, in: cacheDir)
             state = .failed(message)
             return .failure(message)
         case .succeeded:

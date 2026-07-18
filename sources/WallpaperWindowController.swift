@@ -1,6 +1,14 @@
 import AppKit
 import AVFoundation
 
+/// Content views that can cheaply pause/resume expensive rendering when their
+/// hosting panel becomes fully occluded or visible again. Both the video and GIF
+/// wallpaper views conform so occlusion power-saving covers every wallpaper type.
+@MainActor
+protocol OcclusionPausable: AnyObject {
+    func setOcclusionHidden(_ hidden: Bool)
+}
+
 /// Manages a single WallpaperPanel for one screen.
 /// Hosts an AppKit content view (video or GIF) directly — no SwiftUI bridge.
 @MainActor
@@ -31,21 +39,20 @@ final class WallpaperWindowController {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                Self.applyOcclusion(isVisible: self.panel.occlusionState.contains(.visible), to: self.player)
+                Self.applyOcclusion(
+                    isVisible: self.panel.occlusionState.contains(.visible),
+                    to: self.contentView as? OcclusionPausable
+                )
             }
         }
     }
 
-    /// Resume the player when any part of the wallpaper is visible; pause it when
-    /// fully hidden. Split out (and given the player explicitly) so the play/pause
-    /// wiring is unit-testable without the window server.
-    static func applyOcclusion(isVisible: Bool, to player: AVQueuePlayer?) {
-        guard let player else { return }
-        if isVisible {
-            player.play()
-        } else {
-            player.pause()
-        }
+    /// Pause the content when the wallpaper is fully hidden; resume when any part is
+    /// visible. Routes through the content view (video *and* GIF) rather than the
+    /// player directly, so GIF wallpapers pause too. Split out so the play/pause
+    /// policy is unit-testable without the window server.
+    static func applyOcclusion(isVisible: Bool, to pausable: OcclusionPausable?) {
+        pausable?.setOcclusionHidden(!isVisible)
     }
 
     /// Install an AppKit view as the wallpaper content for this panel.

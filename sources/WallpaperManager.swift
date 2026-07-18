@@ -35,6 +35,10 @@ final class WallpaperManager {
     private var powerMonitor: PowerStateMonitor?
     private var systemPaused: Bool = false
     private let loadingOverlay = LoadingOverlayController()
+    /// Display whose YouTube download is currently in flight, so the progress
+    /// overlay (driven by a global `$state` observer with no per-call display
+    /// context) can center on the right screen.
+    private var activeDownloadDisplayID: CGDirectDisplayID?
     private var downloadOverlayObserver: AnyCancellable?
     private let requestCoordinator = WallpaperRequestCoordinator()
     private let persistenceStore = WallpaperPersistenceStore()
@@ -218,6 +222,7 @@ final class WallpaperManager {
 
         let target = assignmentTarget(for: displayID)
         let originSpaceID = displayID.map { currentSpaceID(for: $0) } ?? 0
+        activeDownloadDisplayID = displayID
         cancelRestoreTask()
         requestCoordinator.start(for: target) { [weak self] token in
             guard let self else { return }
@@ -253,7 +258,7 @@ final class WallpaperManager {
         let originSpaceID = displayID.map { currentSpaceID(for: $0) } ?? 0
         requestCoordinator.start(for: target) { [weak self] token in
             guard let self else { return }
-            loadingOverlay.show(message: "Shuffling...")
+            loadingOverlay.show(message: "Shuffling…", on: screen(for: displayID))
             guard let url = await photosService.randomVideoURL() else {
                 guard requestCoordinator.isCurrent(token, for: target) else { return }
                 loadingOverlay.hide()
@@ -339,6 +344,13 @@ final class WallpaperManager {
 
     // MARK: - Loading Overlay
 
+    /// Resolve the `NSScreen` for a target display, or nil (→ main screen) for the
+    /// all-desktops / no-target case.
+    private func screen(for displayID: CGDirectDisplayID?) -> NSScreen? {
+        guard let displayID else { return nil }
+        return NSScreen.screens.first { $0.displayID == displayID }
+    }
+
     private func observeDownloadState() {
         downloadOverlayObserver = youtubeDownloader.$state
             .receive(on: RunLoop.main)
@@ -347,9 +359,14 @@ final class WallpaperManager {
                 switch state {
                 case .downloading(let progress):
                     let pct = Int(progress * 100)
-                    self.loadingOverlay.show(message: "Downloading \(pct)%", progress: progress)
+                    self.loadingOverlay.show(
+                        message: "Downloading \(pct)%",
+                        progress: progress,
+                        on: self.screen(for: self.activeDownloadDisplayID)
+                    )
                 case .idle, .failed:
                     self.loadingOverlay.hide()
+                    self.activeDownloadDisplayID = nil
                 }
             }
     }

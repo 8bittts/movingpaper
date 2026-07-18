@@ -20,6 +20,7 @@ final class StatusBarController: NSObject {
             let icon = MenuBarIcon.brandIcon()
             icon.accessibilityDescription = "MovingPaper"
             button.image = icon
+            button.toolTip = "MovingPaper"
         }
         let menu = NSMenu()
         // Manage enabled state ourselves; otherwise AppKit auto-enables any item
@@ -36,7 +37,7 @@ final class StatusBarController: NSObject {
         // Show download progress if active
         if case .downloading(let progress) = wallpaperManager.youtubeDownloader.state {
             let pct = Int(progress * 100)
-            let progressItem = NSMenuItem(title: "Downloading: \(pct)%...", action: nil, keyEquivalent: "")
+            let progressItem = NSMenuItem(title: "Downloading: \(pct)%…", action: nil, keyEquivalent: "")
             progressItem.isEnabled = false
             menu.addItem(progressItem)
 
@@ -60,16 +61,17 @@ final class StatusBarController: NSObject {
         menu.addItem(.separator())
 
         // ── Sound toggle ──
+        // The state is spelled out in the label (HIG's changing-state style), so
+        // no checkmark — a checkmark alongside "Sound: On" would double-signal.
+        // No key equivalent: an accessory status-menu shortcut only fires while
+        // the menu is open, so advertising ⌘S here is misleading.
         let soundTitle = wallpaperManager.isMuted ? "Sound: Off" : "Sound: On"
         let soundItem = NSMenuItem(
             title: soundTitle,
             action: #selector(toggleMute),
-            keyEquivalent: "s"
+            keyEquivalent: ""
         )
         soundItem.target = self
-        if !wallpaperManager.isMuted {
-            soundItem.state = .on
-        }
         menu.addItem(soundItem)
 
         // ── Mode toggle ──
@@ -102,11 +104,10 @@ final class StatusBarController: NSObject {
         // ── Pause / Resume ──
         if wallpaperManager.hasAnyWallpaper {
             let pauseTitle = wallpaperManager.isPaused ? "Resume" : "Pause"
-            let pauseKey = wallpaperManager.isPaused ? "r" : "p"
             let pauseItem = NSMenuItem(
                 title: pauseTitle,
                 action: #selector(togglePause),
-                keyEquivalent: pauseKey
+                keyEquivalent: ""
             )
             pauseItem.target = self
             menu.addItem(pauseItem)
@@ -116,11 +117,11 @@ final class StatusBarController: NSObject {
 
         // ── Check for Updates ──
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
-        let updateTitle = version.isEmpty ? "Check for Updates..." : "Check for Updates (v\(version))..."
+        let updateTitle = version.isEmpty ? "Check for Updates…" : "Check for Updates (v\(version))…"
         let updateItem = NSMenuItem(
             title: updateTitle,
             action: #selector(checkForUpdates),
-            keyEquivalent: "u"
+            keyEquivalent: ""
         )
         updateItem.target = self
         updateItem.isEnabled = updater.canCheckForUpdates
@@ -172,23 +173,23 @@ final class StatusBarController: NSObject {
         }
 
         let chooseItem = NSMenuItem(
-            title: "Choose File...",
+            title: "Choose File…",
             action: #selector(chooseFileForAll),
-            keyEquivalent: "o"
+            keyEquivalent: ""
         )
         chooseItem.target = self
         menu.addItem(chooseItem)
 
         let youtubeItem = NSMenuItem(
-            title: "Paste YouTube URL...",
+            title: "Paste YouTube URL…",
             action: #selector(pasteYouTubeURLForAll),
-            keyEquivalent: "y"
+            keyEquivalent: ""
         )
         youtubeItem.target = self
         menu.addItem(youtubeItem)
 
         let photosItem = NSMenuItem(
-            title: "Choose from Photos...",
+            title: "Choose from Photos…",
             action: #selector(chooseFromPhotosForAll),
             keyEquivalent: ""
         )
@@ -219,12 +220,9 @@ final class StatusBarController: NSObject {
         for (displayIndex, display) in displays.enumerated() {
             // Show display name only if multiple monitors
             if displays.count > 1 {
-                let displayHeader = NSMenuItem(
-                    title: MenuBarLabelFormatter.displayHeaderTitle(display.name),
-                    action: nil,
-                    keyEquivalent: ""
+                let displayHeader = NSMenuItem.sectionHeader(
+                    title: MenuBarLabelFormatter.displayHeaderTitle(display.name)
                 )
-                displayHeader.isEnabled = false
                 menu.addItem(displayHeader)
             }
 
@@ -275,9 +273,9 @@ final class StatusBarController: NSObject {
     private func buildDisplaySubmenu(_ menu: NSMenu, displayID: CGDirectDisplayID, includeRemove: Bool) {
         let tag = Int(displayID)
         for (title, action) in [
-            ("Choose File...", #selector(chooseFileForDisplay(_:))),
-            ("Paste YouTube URL...", #selector(pasteYouTubeURLForDisplay(_:))),
-            ("Choose from Photos...", #selector(chooseFromPhotosForDisplay(_:))),
+            ("Choose File…", #selector(chooseFileForDisplay(_:))),
+            ("Paste YouTube URL…", #selector(pasteYouTubeURLForDisplay(_:))),
+            ("Choose from Photos…", #selector(chooseFromPhotosForDisplay(_:))),
             ("Shuffle from Photos", #selector(shuffleFromPhotosForDisplay(_:))),
         ] {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: "")

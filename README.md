@@ -86,15 +86,15 @@ Plays a looping video or GIF as your desktop background. Everything on your desk
 
 | Item | |
 |------|---|
-| **Choose File...** | Pick a `.gif`, `.mp4`, `.mov`, or `.m4v` |
-| **Paste YouTube URL...** | Download a supported YouTube URL as wallpaper |
-| **Choose from Photos...** | Pick a video from your Photos library |
+| **Choose File…** | Pick a `.gif`, `.mp4`, `.mov`, or `.m4v` |
+| **Paste YouTube URL…** | Download a supported YouTube URL as wallpaper |
+| **Choose from Photos…** | Pick a video from your Photos library |
 | **Shuffle from Photos** | Random video from your entire library |
 | **Sound: Off / On** | Toggle video audio |
 | **MovingPaper Mode** | All Desktops or Per Desktop |
 | **Pause / Resume** | Stop or restart playback |
 | **Remove MovingPaper** | Clear wallpaper |
-| **Check for Updates...** | Sparkle update check in a dockless updater dialog |
+| **Check for Updates…** | Sparkle update check in a dockless updater dialog |
 | **Built with YEN** | Visit yen.chat |
 | **Quit MovingPaper** | Exit |
 

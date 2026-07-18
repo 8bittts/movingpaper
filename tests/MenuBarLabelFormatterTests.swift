@@ -9,7 +9,7 @@ struct MenuBarLabelFormatterTests {
         )
 
         #expect(title.count <= MenuBarLabelFormatter.maxVisibleCharacters)
-        #expect(title.contains("..."))
+        #expect(title.contains("…"))
         #expect(title.hasSuffix(".mp4"))
     }
 
@@ -21,7 +21,7 @@ struct MenuBarLabelFormatterTests {
 
         #expect(title.count <= MenuBarLabelFormatter.maxVisibleCharacters)
         #expect(title.hasPrefix("Desktop 3: "))
-        #expect(title.contains("..."))
+        #expect(title.contains("…"))
         #expect(title.hasSuffix(".gif"))
     }
 }

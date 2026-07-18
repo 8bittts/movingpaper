@@ -81,3 +81,9 @@ final class VideoPlayerNSView: NSView {
         super.removeFromSuperview()
     }
 }
+
+extension VideoPlayerNSView: OcclusionPausable {
+    func setOcclusionHidden(_ hidden: Bool) {
+        if hidden { player?.pause() } else { player?.play() }
+    }
+}

@@ -75,7 +75,10 @@ final class PhotosService: Sendable {
     }
 
     private func requestExportSession(for asset: PHAsset) async -> AVAssetExportSession? {
-        nonisolated(unsafe) var requestID: PHImageRequestID = PHInvalidImageRequestID
+        // The cancellation handler runs concurrently with the operation, so the
+        // request ID is published through a lock-guarded box rather than a bare
+        // `nonisolated(unsafe) var` (which would be an unsynchronized read/write race).
+        let requestID = RequestIDBox()
         nonisolated(unsafe) var exportSession: AVAssetExportSession?
 
         await withTaskCancellationHandler(operation: {
@@ -84,18 +87,19 @@ final class PhotosService: Sendable {
                 reqOptions.isNetworkAccessAllowed = true
                 reqOptions.deliveryMode = .highQualityFormat
 
-                requestID = PHImageManager.default().requestExportSession(
+                requestID.set(PHImageManager.default().requestExportSession(
                     forVideo: asset,
                     options: reqOptions,
                     exportPreset: AVAssetExportPresetHighestQuality
                 ) { session, _ in
                     exportSession = session
                     continuation.resume()
-                }
+                })
             }
         }, onCancel: {
-            if requestID != PHInvalidImageRequestID {
-                PHImageManager.default().cancelImageRequest(requestID)
+            let id = requestID.current
+            if id != PHInvalidImageRequestID {
+                PHImageManager.default().cancelImageRequest(id)
             }
         })
 
@@ -114,6 +118,21 @@ final class PhotosService: Sendable {
         }, onCancel: {
             session.cancelExport()
         })
+    }
+}
+
+/// Lock-guarded holder for a `PHImageRequestID` published from the export-session
+/// operation closure and read by the concurrent cancellation handler.
+private final class RequestIDBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: PHImageRequestID = PHInvalidImageRequestID
+    func set(_ id: PHImageRequestID) {
+        lock.lock(); defer { lock.unlock() }
+        value = id
+    }
+    var current: PHImageRequestID {
+        lock.lock(); defer { lock.unlock() }
+        return value
     }
 }
 

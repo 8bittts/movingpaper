@@ -38,6 +38,22 @@ struct ManagedDisplaySpacesSnapshotTests {
         #expect(snapshot.knownSpacesByDisplayID[CGDirectDisplayID(202)] == Set([19]))
     }
 
+    @Test func duplicateDisplayIdentifiersCollapseInsteadOfTrapping() {
+        // Two identifiers resolving to the same displayID must collapse, not trap
+        // the dictionary construction.
+        let snapshot = ManagedDisplaySpacesSnapshot.from(
+            rawEntries: [],
+            screensByDisplayIdentifier: [
+                "DISPLAY-A": CGDirectDisplayID(101),
+                "DISPLAY-A-MIRROR": CGDirectDisplayID(101),
+            ],
+            fallbackGlobalSpaceID: 5
+        )
+
+        #expect(snapshot.activeSpaceByDisplayID[CGDirectDisplayID(101)] == 5)
+        #expect(snapshot.knownSpacesByDisplayID[CGDirectDisplayID(101)] == Set([5]))
+    }
+
     @Test func ignoresEntriesForDisplaysNotCurrentlyConnected() {
         let snapshot = ManagedDisplaySpacesSnapshot.from(
             rawEntries: [

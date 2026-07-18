@@ -2,7 +2,7 @@ import Foundation
 
 enum MenuBarLabelFormatter {
     static let maxVisibleCharacters = 30
-    private static let ellipsis = "..."
+    private static let ellipsis = "…"
 
     static func sharedWallpaperTitle(fileName: String) -> String {
         truncateMiddle(fileName, maxLength: maxVisibleCharacters)

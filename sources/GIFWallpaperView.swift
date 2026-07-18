@@ -6,6 +6,8 @@ import ImageIO
 /// GIF's delay metadata automatically.
 final class GIFAnimationNSView: NSView {
     private var imageLayer: CALayer?
+    /// The GIF currently loaded, so occlusion resume can restart it.
+    private(set) var currentURL: URL?
 
     // The animation callback runs on a background thread, so the "is this
     // animation still current?" flag must be read/written under a lock. Each
@@ -49,6 +51,7 @@ final class GIFAnimationNSView: NSView {
     }
 
     func loadGIF(url: URL) {
+        currentURL = url
         imageLayer?.contents = nil
         let token = bumpGeneration()
 
@@ -79,5 +82,18 @@ final class GIFAnimationNSView: NSView {
     override func removeFromSuperview() {
         stopAnimation()
         super.removeFromSuperview()
+    }
+}
+
+extension GIFAnimationNSView: OcclusionPausable {
+    func setOcclusionHidden(_ hidden: Bool) {
+        if hidden {
+            stopAnimation()
+        } else if let currentURL {
+            // CGAnimateImageAtURLWithBlock has no resume-at-frame API, so a revealed
+            // GIF restarts from the first frame — imperceptible for a wallpaper that
+            // was fully occluded while paused.
+            loadGIF(url: currentURL)
+        }
     }
 }

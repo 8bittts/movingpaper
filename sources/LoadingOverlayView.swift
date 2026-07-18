@@ -8,7 +8,6 @@ private enum Brand {
     static let accent = Color(red: 0.55, green: 0.65, blue: 0.90)
     static let textDim = Color(white: 0.68)
     static let textBright = Color(white: 1.0)
-    static let track = Color(white: 0.18)
 }
 
 // MARK: - SwiftUI View
@@ -17,6 +16,11 @@ struct LoadingOverlayView: View {
     let message: String
     let progress: Double?
 
+    // Honor the system accessibility preferences: no sweeping motion under
+    // Reduce Motion, no translucency under Reduce Transparency. NSHostingView
+    // forwards both system values into SwiftUI automatically.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var phase: CGFloat = 0
 
     var body: some View {
@@ -30,18 +34,25 @@ struct LoadingOverlayView: View {
         .padding(.vertical, 18)
         .background(pill)
         .onAppear {
+            // Reduce Motion: leave the sheen parked and show static text.
+            guard !reduceMotion else { return }
             withAnimation(.linear(duration: 2.2).repeatForever(autoreverses: false)) {
                 phase = 1
             }
         }
     }
 
-    // Text with a sheen that sweeps left-to-right
+    // Text with a sheen that sweeps left-to-right. Under Reduce Motion the sweep
+    // is dropped and the text is shown statically at full brightness.
     private var shimmerText: some View {
         Text(message)
             .font(.system(size: 13, weight: .semibold, design: .rounded))
-            .foregroundColor(Brand.textDim)
-            .overlay(sheen.mask(textMask))
+            .foregroundColor(reduceMotion ? Brand.textBright : Brand.textDim)
+            .overlay {
+                if !reduceMotion {
+                    sheen.mask(textMask)
+                }
+            }
     }
 
     private var textMask: some View {
@@ -63,22 +74,18 @@ struct LoadingOverlayView: View {
         }
     }
 
+    // Standard determinate indicator — brings built-in Reduce Motion handling,
+    // correct layout direction, and VoiceOver progress value for free.
     private func progressBar(value: Double) -> some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule().fill(Brand.track)
-                Capsule()
-                    .fill(Brand.accent)
-                    .frame(width: max(4, geo.size.width * value))
-                    .animation(.easeInOut(duration: 0.3), value: value)
-            }
-        }
-        .frame(width: 180, height: 3)
+        ProgressView(value: value)
+            .progressViewStyle(.linear)
+            .tint(Brand.accent)
+            .frame(width: 180)
     }
 
     private var pill: some View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .fill(Brand.bg.opacity(0.92))
+            .fill(Brand.bg.opacity(reduceTransparency ? 1.0 : 0.92))
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(Brand.accent.opacity(0.12), lineWidth: 0.5)
@@ -93,8 +100,11 @@ struct LoadingOverlayView: View {
 final class LoadingOverlayController {
     private var panel: NSPanel?
     private var hostingView: NSHostingView<AnyView>?
+    /// The display to center on (nil → main screen, for all-desktops changes).
+    private var targetScreen: NSScreen?
 
-    func show(message: String, progress: Double? = nil) {
+    func show(message: String, progress: Double? = nil, on screen: NSScreen? = nil) {
+        targetScreen = screen
         let content = LoadingOverlayView(message: message, progress: progress)
 
         if let hostingView {
@@ -102,6 +112,10 @@ final class LoadingOverlayController {
             resizePanel()
             return
         }
+
+        // First appearance of this overlay: announce it for VoiceOver, since the
+        // borderless nonactivating panel never takes focus on its own.
+        announce(message)
 
         let hosting = NSHostingView(rootView: AnyView(content))
         let size = hosting.fittingSize
@@ -157,6 +171,19 @@ final class LoadingOverlayController {
         })
     }
 
+    /// Post a VoiceOver announcement for the transient overlay status. Best-effort
+    /// for an accessory app, but never worse than the current silence.
+    private func announce(_ message: String) {
+        NSAccessibility.post(
+            element: NSApp as Any,
+            notification: .announcementRequested,
+            userInfo: [
+                .announcement: message,
+                .priority: NSAccessibilityPriorityLevel.high.rawValue,
+            ]
+        )
+    }
+
     private func resizePanel() {
         guard let panel, let hostingView else { return }
         let size = hostingView.fittingSize
@@ -166,7 +193,7 @@ final class LoadingOverlayController {
     }
 
     private func centerOnScreen(_ window: NSPanel) {
-        guard let screen = NSScreen.main else { return }
+        guard let screen = targetScreen ?? NSScreen.main else { return }
         let x = screen.frame.midX - window.frame.width / 2
         let y = screen.frame.midY - window.frame.height / 2
         window.setFrameOrigin(NSPoint(x: x, y: y))

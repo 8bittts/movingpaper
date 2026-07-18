@@ -35,6 +35,10 @@ final class PhotosPickerController: NSObject {
         window.minSize = NSSize(width: 600, height: 400)
         window.center()
         window.isReleasedWhenClosed = false
+        // NSPanel defaults hidesOnDeactivate = true, which would remove the picker
+        // from screen the moment the app deactivates (e.g. the user Cmd-Tabs away).
+        // Keep it visible until the user actually picks or cancels.
+        window.hidesOnDeactivate = false
         window.level = .floating
         window.delegate = self
         window.contentViewController = pickerVC
