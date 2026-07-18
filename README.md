@@ -72,8 +72,6 @@ Plays a looping video or GIF as your desktop background. Everything on your desk
 
 ## Features
 
-- **Apple Photos integration** -- pick a video or shuffle a random one from your entire library
-- **YouTube wallpapers** -- paste a supported YouTube URL, it downloads and loops
 - **Resilient async loading** -- stale YouTube and Photos results are cancelled or ignored so your newest wallpaper choice wins
 - **Loading overlay** -- on-brand shimmer pill floats above all windows so you always know what's happening
 - **Per-desktop wallpapers** -- different wallpaper on each macOS Space and monitor, including separate Spaces per display
