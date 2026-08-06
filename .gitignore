@@ -5,15 +5,12 @@
 /build/local-run/
 /build/*.dmg
 /build/*.sha256
-/todos.md
 /Packages
 xcuserdata/
 DerivedData/
 .swiftpm/
 *.xcodeproj/xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
-CLAUDE.md
-AGENTS.md
 .claude/commands/
 .codex/
 tools/yt-dlp/yt-dlp
