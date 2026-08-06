@@ -12,8 +12,9 @@ There is no numbered `_docs/` series — **`README.md` is the primary doc surfac
 |-----|------|
 | `README.md` | User features, build, release, smoke-test matrix, permissions |
 | `AGENTS.md` | Agent constraints (no Settings UI, WallpaperManager seams, yt-dlp pin, Sparkle hooks) |
-| `todos.md` | **Only** active backlog (#29 runtime check) |
-| `audit-closure-2026.md` | Shipped audit fixes + won't-fix registry (2026) |
+| `_docs/todos.md` | **Only** active backlog (#29 runtime check) |
+| `_docs/audit-closure-2026.md` | Shipped audit fixes + won't-fix registry (2026) |
+| Root `todos.md` | Stub redirect → `_docs/todos.md` |
 
 ## Sibling macOS apps
 
