@@ -118,6 +118,18 @@ sign_with_retry() {
     fail "Signing failed after $max_attempts attempts"
 }
 
+json_value() {
+    local key="$1" file="$2"
+    /usr/bin/plutil -extract "$key" raw -o - "$file" 2>/dev/null || true
+}
+
+print_notary_log() {
+    local submission_id="$1"
+    [ -n "$submission_id" ] || return 0
+    warn "Fetching notarization log for ${submission_id}"
+    xcrun notarytool log "$submission_id" --keychain-profile "$NOTARY_PROFILE" || true
+}
+
 can_notarize() {
     [ "$BUILD_ONLY" = false ] \
         && [ "$LOCAL_MODE" = false ] \
@@ -372,20 +384,37 @@ fi
 
 if can_notarize; then
     info "Notarizing DMG"
-    xcrun notarytool submit "$DMG_FINAL" \
+    NOTARY_JSON="${BUILD_DIR}/${APP_NAME}-${VERSION}.notary-submission.json"
+    if ! xcrun notarytool submit "$DMG_FINAL" \
         --keychain-profile "$NOTARY_PROFILE" \
-        --wait
+        --wait \
+        --output-format json > "$NOTARY_JSON"; then
+        print_notary_log "$(json_value id "$NOTARY_JSON")"
+        fail "Notarization submission failed"
+    fi
+    NOTARY_ID="$(json_value id "$NOTARY_JSON")"
+    NOTARY_STATUS="$(json_value status "$NOTARY_JSON")"
+    step "Notary submission ${NOTARY_ID:-unknown}: ${NOTARY_STATUS:-unknown}"
+    # `notarytool submit --wait` exits 0 even when the service rejects the
+    # build, so the status must be asserted or a rejected DMG ships.
+    if [ "$NOTARY_STATUS" != "Accepted" ]; then
+        print_notary_log "$NOTARY_ID"
+        fail "Notarization rejected"
+    fi
 
     attempt=0
+    stapled=false
     while [ $attempt -lt 10 ]; do
         if xcrun stapler staple "$DMG_FINAL" 2>&1; then
             step "Notarization ticket stapled"
+            stapled=true
             break
         fi
         attempt=$((attempt + 1))
         step "Staple retry $attempt/10..."
         sleep 10
     done
+    [ "$stapled" = true ] || fail "Staple retry limit exhausted"
 else
     if [ "$LOCAL_MODE" = true ]; then
         step "Skipping notarization (--local)"
