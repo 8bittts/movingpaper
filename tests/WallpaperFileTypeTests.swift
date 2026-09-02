@@ -39,4 +39,10 @@ struct WallpaperFileTypeTests {
         let url = URL(fileURLWithPath: "/tmp/wallpaper")
         #expect(WallpaperFileType.detect(for: url) == nil)
     }
+
+    @Test func movieContainerThatIsNotAKnownWallpaperExtensionIsRejected() {
+        #expect(WallpaperFileType.detect(for: URL(fileURLWithPath: "/tmp/clip.mkv")) == nil)
+        #expect(WallpaperFileType.detect(for: URL(fileURLWithPath: "/tmp/clip.avi")) == nil)
+        #expect(WallpaperFileType.detect(for: URL(fileURLWithPath: "/tmp/clip.webm")) == nil)
+    }
 }

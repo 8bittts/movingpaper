@@ -9,6 +9,52 @@ struct WallpaperRedownloadRequest: Equatable {
     let localURL: URL
 }
 
+/// One on-disk wallpaper record. Keys are schema v1 (`displayID`, `spaceID`,
+/// `path`, optional `youtubeURL`) and must stay stable unless `currentSchemaVersion` bumps.
+struct WallpaperPersistedRecord: Equatable {
+    var displayID: CGDirectDisplayID
+    var spaceID: UInt64
+    var path: String
+    var youtubeURL: String?
+
+    init(key: DesktopKey, path: String, youtubeURL: String?) {
+        self.displayID = key.displayID
+        self.spaceID = key.spaceID
+        self.path = path
+        self.youtubeURL = youtubeURL
+    }
+
+    init?(plistObject: [String: Any]) {
+        guard
+            let displayIDNum = plistObject["displayID"] as? NSNumber,
+            let spaceIDNum = plistObject["spaceID"] as? NSNumber,
+            let path = plistObject["path"] as? String
+        else {
+            return nil
+        }
+        self.displayID = displayIDNum.uint32Value
+        self.spaceID = spaceIDNum.uint64Value
+        self.path = path
+        self.youtubeURL = plistObject["youtubeURL"] as? String
+    }
+
+    var key: DesktopKey {
+        DesktopKey(displayID: displayID, spaceID: spaceID)
+    }
+
+    func plistObject() -> [String: Any] {
+        var record: [String: Any] = [
+            "displayID": NSNumber(value: displayID),
+            "spaceID": NSNumber(value: spaceID),
+            "path": path,
+        ]
+        if let youtubeURL {
+            record["youtubeURL"] = youtubeURL
+        }
+        return record
+    }
+}
+
 struct WallpaperPersistedState: Equatable {
     var mode: WallpaperMode
     var isMuted: Bool
@@ -67,27 +113,24 @@ struct WallpaperPersistenceStore {
         pendingRedownloads: [WallpaperRedownloadRequest] = []
     ) {
         var encoded: [[String: Any]] = state.entries.map { key, entry in
-            var record: [String: Any] = [
-                "displayID": NSNumber(value: key.displayID),
-                "spaceID": NSNumber(value: key.spaceID),
-                "path": entry.localURL.path(percentEncoded: false),
-            ]
-            if let youtubeURL = entry.youtubeOrigin {
-                record["youtubeURL"] = youtubeURL
-            }
-            return record
+            WallpaperPersistedRecord(
+                key: key,
+                path: entry.localURL.path(percentEncoded: false),
+                youtubeURL: entry.youtubeOrigin
+            ).plistObject()
         }
 
         // Re-emit still-pending YouTube redownloads (cache file missing, not yet
         // resolved) so an unrelated save during the redownload window doesn't
         // erase them. Skip any key the user has since assigned directly.
         for request in pendingRedownloads where state.entries[request.key] == nil {
-            encoded.append([
-                "displayID": NSNumber(value: request.key.displayID),
-                "spaceID": NSNumber(value: request.key.spaceID),
-                "path": request.localURL.path(percentEncoded: false),
-                "youtubeURL": request.youtubeURL,
-            ])
+            encoded.append(
+                WallpaperPersistedRecord(
+                    key: request.key,
+                    path: request.localURL.path(percentEncoded: false),
+                    youtubeURL: request.youtubeURL
+                ).plistObject()
+            )
         }
 
         userDefaults.set(encoded, forKey: Defaults.desktopFiles)
@@ -110,32 +153,27 @@ struct WallpaperPersistenceStore {
         }
 
         for record in records {
-            guard
-                let displayIDNum = record["displayID"] as? NSNumber,
-                let spaceIDNum = record["spaceID"] as? NSNumber,
-                let path = record["path"] as? String
-            else {
+            guard let parsed = WallpaperPersistedRecord(plistObject: record) else {
                 continue
             }
 
-            let key = DesktopKey(
-                displayID: displayIDNum.uint32Value,
-                spaceID: spaceIDNum.uint64Value
-            )
-            let youtubeURL = record["youtubeURL"] as? String
-
+            let key = parsed.key
             if key.spaceID != 0 {
                 persisted.state.knownSpaces[key.displayID, default: []].insert(key.spaceID)
             }
 
-            if fileExists(path) {
+            if fileExists(parsed.path) {
                 persisted.state.entries[key] = WallpaperEntry(
-                    localURL: URL(filePath: path),
-                    youtubeOrigin: youtubeURL
+                    localURL: URL(filePath: parsed.path),
+                    youtubeOrigin: parsed.youtubeURL
                 )
-            } else if let youtubeURL {
+            } else if let youtubeURL = parsed.youtubeURL {
                 persisted.needsRedownload.append(
-                    WallpaperRedownloadRequest(key: key, youtubeURL: youtubeURL, localURL: URL(filePath: path))
+                    WallpaperRedownloadRequest(
+                        key: key,
+                        youtubeURL: youtubeURL,
+                        localURL: URL(filePath: parsed.path)
+                    )
                 )
             }
         }

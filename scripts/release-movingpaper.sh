@@ -49,18 +49,8 @@ verify_live_appcast() {
     fail "Signed appcast failed to propagate or validate at ${appcast_url}"
 }
 
-plist_set() {
-    local plist="$1"
-    local key="$2"
-    local type="$3"
-    local value="$4"
-
-    if /usr/libexec/PlistBuddy -c "Print :${key}" "$plist" >/dev/null 2>&1; then
-        /usr/libexec/PlistBuddy -c "Set :${key} ${value}" "$plist"
-    else
-        /usr/libexec/PlistBuddy -c "Add :${key} ${type} ${value}" "$plist"
-    fi
-}
+# shellcheck source=lib/plist.sh
+source "${REPO_ROOT}/scripts/lib/plist.sh"
 
 bump_version() {
     local current="$1"

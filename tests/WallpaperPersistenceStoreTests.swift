@@ -177,6 +177,29 @@ struct WallpaperPersistenceStoreTests {
         #expect(loaded.state.knownSpaces[5] == Set([9]))
     }
 
+    @Test func persistedRecordRoundTripsSchemaV1Keys() {
+        let key = DesktopKey(displayID: 9, spaceID: 4)
+        let record = WallpaperPersistedRecord(
+            key: key,
+            path: "/tmp/loop.mp4",
+            youtubeURL: "https://youtu.be/x"
+        )
+        let object = record.plistObject()
+        #expect(object["displayID"] as? NSNumber == NSNumber(value: CGDirectDisplayID(9)))
+        #expect(object["spaceID"] as? NSNumber == NSNumber(value: UInt64(4)))
+        #expect(object["path"] as? String == "/tmp/loop.mp4")
+        #expect(object["youtubeURL"] as? String == "https://youtu.be/x")
+        #expect(Set(object.keys) == ["displayID", "spaceID", "path", "youtubeURL"])
+
+        let parsed = WallpaperPersistedRecord(plistObject: object)
+        #expect(parsed == record)
+        #expect(parsed?.key == key)
+
+        let localOnly = WallpaperPersistedRecord(key: key, path: "/tmp/loop.mp4", youtubeURL: nil)
+        #expect(Set(localOnly.plistObject().keys) == ["displayID", "spaceID", "path"])
+        #expect(WallpaperPersistedRecord(plistObject: ["displayID": NSNumber(value: 1)]) == nil)
+    }
+
     @Test func skipsMalformedRecordsButLoadsValidOnes() throws {
         let defaults = try temporaryDefaults()
         defer { defaults.cleanup() }

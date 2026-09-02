@@ -51,18 +51,8 @@ warn()  { printf "\033[1;33mWARN:\033[0m %s\n" "$1"; }
 fail()  { printf "\033[1;31mERROR:\033[0m %s\n" "$1" >&2; exit 1; }
 step()  { printf "\033[1;36m  ->\033[0m %s\n" "$1"; }
 
-plist_set() {
-    local plist="$1"
-    local key="$2"
-    local type="$3"
-    local value="$4"
-
-    if /usr/libexec/PlistBuddy -c "Print :${key}" "$plist" >/dev/null 2>&1; then
-        /usr/libexec/PlistBuddy -c "Set :${key} ${value}" "$plist"
-    else
-        /usr/libexec/PlistBuddy -c "Add :${key} ${type} ${value}" "$plist"
-    fi
-}
+# shellcheck source=lib/plist.sh
+source "${REPO_ROOT}/scripts/lib/plist.sh"
 
 resolve_signing_identity() {
     if [ "$UNSIGNED" = true ]; then
@@ -225,12 +215,7 @@ plist_set "$INFO_PLIST" "CFBundleIconFile" string "$APP_NAME"
 plist_set "$INFO_PLIST" "NSPrincipalClass" string "NSApplication"
 # Packaged builds skip Sparkle's permission prompt and opt into stronger
 # archive verification before extraction.
-plist_set "$INFO_PLIST" "SUEnableAutomaticChecks" bool true
-plist_set "$INFO_PLIST" "SUFeedURL" string "$SPARKLE_FEED_URL"
-plist_set "$INFO_PLIST" "SUPublicEDKey" string "$SPARKLE_PUBLIC_ED_KEY"
-plist_set "$INFO_PLIST" "SUScheduledCheckInterval" integer 3600
-plist_set "$INFO_PLIST" "SUVerifyUpdateBeforeExtraction" bool true
-plist_set "$INFO_PLIST" "SURequireSignedFeed" bool true
+apply_sparkle_plist_keys "$INFO_PLIST" "$SPARKLE_FEED_URL" "$SPARKLE_PUBLIC_ED_KEY"
 step "Generated Info.plist"
 
 step "App bundle assembled at ${APP_BUNDLE}"

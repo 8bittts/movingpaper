@@ -22,10 +22,10 @@ final class WallpaperManager {
     var isMuted: Bool = true
 
     /// YouTube downloader for pasting YouTube URLs as wallpapers.
-    let youtubeDownloader = YouTubeDownloader()
+    private let youtubeDownloader = YouTubeDownloader()
 
     /// Photos library access for shuffle mode.
-    let photosService = PhotosService()
+    private let photosService = PhotosService()
 
     // MARK: - Private State
 
@@ -118,6 +118,39 @@ final class WallpaperManager {
     /// Whether any desktop has a wallpaper assigned.
     var hasAnyWallpaper: Bool { !state.isEmpty }
 
+    /// Snapshot the status menu needs without exposing the downloader.
+    func menuInput(appVersion: String, canCheckForUpdates: Bool) -> MenuModelInput {
+        let progress: Double?
+        if case .downloading(let value) = youtubeDownloader.state {
+            progress = value
+        } else {
+            progress = nil
+        }
+        return MenuModelInput(
+            downloadProgress: progress,
+            mode: mode,
+            isMuted: isMuted,
+            isPaused: isPaused,
+            hasAnyWallpaper: hasAnyWallpaper,
+            sharedFileName: sharedFileURL?.lastPathComponent,
+            canCheckForUpdates: canCheckForUpdates,
+            appVersion: appVersion,
+            displays: connectedDisplays.map { display in
+                DisplayMenuInput(
+                    id: display.id,
+                    name: display.name,
+                    spaces: spaceAssignments(for: display.id).map {
+                        SpaceMenuInput(fileName: $0.fileName, isCurrent: $0.isCurrent)
+                    }
+                )
+            }
+        )
+    }
+
+    func cancelDownload() {
+        youtubeDownloader.cancel()
+    }
+
     /// Local file paths currently referenced by live wallpaper assignments.
     /// Used to protect in-use cache files from eviction by `CacheJanitor`.
     var referencedLocalPaths: Set<String> {
@@ -186,27 +219,26 @@ final class WallpaperManager {
         spaceID: UInt64? = nil,
         youtubeOrigin: String? = nil
     ) {
-        isPaused = false
+        guard WallpaperFileType.detect(for: url) != nil else {
+            showAlert(
+                title: "Unsupported File",
+                message: "Choose a GIF or video file (.gif, .mp4, .mov, or .m4v)."
+            )
+            return
+        }
 
-        switch mode {
-        case .allDesktops:
-            let entry = WallpaperEntry(localURL: url, youtubeOrigin: youtubeOrigin)
-            state.applyShared(entry: entry, across: connectedDisplayIDs)
-        case .perDesktop:
-            let entry = WallpaperEntry(localURL: url, youtubeOrigin: youtubeOrigin)
-            if let id = displayID {
-                let space = spaceID ?? currentSpaceID(for: id)
-                state.setEntry(entry, for: DesktopKey(displayID: id, spaceID: space))
-            } else {
-                // A "for all" pick that resolves while in perDesktop mode (e.g. the
-                // picker opened in allDesktops, then the user switched modes): apply
-                // to every connected display on its current space rather than
-                // silently dropping the chosen media.
-                for displayID in connectedDisplayIDs {
-                    let key = DesktopKey(displayID: displayID, spaceID: currentSpaceID(for: displayID))
-                    state.setEntry(entry, for: key)
-                }
-            }
+        isPaused = false
+        let entry = WallpaperEntry(localURL: url, youtubeOrigin: youtubeOrigin)
+        let keys = state.assign(
+            entry,
+            mode: mode,
+            displayID: displayID,
+            spaceID: spaceID,
+            connectedDisplayIDs: connectedDisplayIDs,
+            currentSpaceID: { [self] id in currentSpaceID(for: id) }
+        )
+        for key in keys {
+            pendingRedownloads[key] = nil
         }
 
         saveState()
@@ -410,6 +442,7 @@ final class WallpaperManager {
                 let youtubeURL = item.youtubeURL
 
                 guard !Task.isCancelled else { return }
+                guard pendingRedownloads[key] != nil else { continue }
                 guard state.entries[key] == nil else { continue }
 
                 guard case .success(let localURL) = await youtubeDownloader.download(youtubeURL: youtubeURL) else {
@@ -418,6 +451,7 @@ final class WallpaperManager {
                 }
 
                 guard !Task.isCancelled else { return }
+                guard pendingRedownloads[key] != nil else { continue }
                 guard state.entries[key] == nil else { continue }
 
                 state.setEntry(

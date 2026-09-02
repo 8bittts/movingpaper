@@ -8,15 +8,6 @@ import Combine
 @MainActor
 final class MovingPaperUpdater: NSObject, ObservableObject {
 
-    enum UpdateStatus: Equatable {
-        case idle
-        case checking
-        case available(version: String)
-        case upToDate
-        case error(message: String)
-    }
-
-    @Published private(set) var status: UpdateStatus = .idle
     @Published private(set) var canCheckForUpdates = false
 
     private var updaterController: SPUStandardUpdaterController?
@@ -54,18 +45,17 @@ final class MovingPaperUpdater: NSObject, ObservableObject {
         do {
             try controller.updater.start()
         } catch {
-            status = .error(message: "Updater failed to start: \(error.localizedDescription)")
+            Log.updater.error("Updater failed to start: \(error.localizedDescription, privacy: .public)")
         }
     }
 
     /// Trigger a manual update check (user-initiated).
     func checkForUpdates() {
         guard let controller = updaterController else {
-            status = .error(message: "Updates unavailable in development builds.")
+            Log.updater.error("Updates unavailable in development builds.")
             return
         }
 
-        status = .checking
         AppPresentation.promoteToForeground()
         startFloatingWindows()
         controller.updater.checkForUpdates()
@@ -119,17 +109,16 @@ extension MovingPaperUpdater: SPUUpdaterDelegate {
 
     func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
         let version = item.displayVersionString.isEmpty ? item.versionString : item.displayVersionString
-        status = .available(version: version)
+        Log.updater.info("Update available: \(version, privacy: .public)")
     }
 
     func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: any Error) {
-        status = .upToDate
+        Log.updater.info("No update found")
     }
 
     func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {
         let message = (error as NSError).localizedDescription
         Log.updater.error("Sparkle aborted: \(message, privacy: .public)")
-        status = .error(message: message)
     }
 }
 

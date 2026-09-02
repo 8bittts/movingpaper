@@ -12,6 +12,7 @@ Sparkle work must go through `./scripts/build_and_run.sh`, which stages a real `
 
 Treat wallpaper runtime actions as real side effects.
 Prefer source inspection and non-launching smoke checks over clicking menu actions that mutate the desktop wallpaper, request Photos access, or start downloads.
+Status-menu structure lives in `MenuSnapshot`; tests cover labels without launching the wallpaper app.
 
 ## Constraints
 
@@ -23,7 +24,8 @@ Prefer source inspection and non-launching smoke checks over clicking menu actio
 - A `WallpaperPersistenceStore` schema change is not done until a test covers the new migration path.
 - New async wallpaper sources go through `WallpaperRequestCoordinator` so the newest user choice wins, and long-running subprocess or network work must cooperate with `withTaskCancellationHandler` so cancellation actually tears it down.
 - Do not enroll a cache in `CacheJanitor` without a recovery story for an evicted file.
-- `YouTubeDownloader` pins yt-dlp by version and hash — bump `pinnedYTDLPVersion` and `pinnedYTDLPSHA256` together.
+- `YTDLPInstaller` pins yt-dlp by version and hash — bump `pinnedVersion` and `pinnedSHA256` together.
+  `YouTubeDownloader` exposes the same values as `pinnedYTDLPVersion` / `pinnedYTDLPSHA256`.
 - Every Sparkle UI entry point must foreground this accessory app; keep the `AppPresentation.promoteToForeground()` + `startFloatingWindows()` pairing on all three entry points in `MovingPaperUpdater` — including `standardUserDriverWillShowModalAlert()` — and the `returnToAccessory()` restore on session finish.
 - `_docs/todos.md` is the only active backlog; root `todos.md` is a tracked redirect stub — do not repopulate or delete it.
   Completed analysis belongs in `_docs/audit-closure-2026.md` or git history.

@@ -60,6 +60,39 @@ struct WallpaperState: Equatable {
         }
     }
 
+    /// Apply one wallpaper choice according to the current mode.
+    ///
+    /// - allDesktops: pin the entry on every connected display (sentinel space 0).
+    /// - perDesktop with a display: assign that display's given or current Space.
+    /// - perDesktop with no display ("for all"): assign every connected display's current Space.
+    @discardableResult
+    mutating func assign(
+        _ entry: WallpaperEntry,
+        mode: WallpaperMode,
+        displayID: CGDirectDisplayID?,
+        spaceID: UInt64?,
+        connectedDisplayIDs: [CGDirectDisplayID],
+        currentSpaceID: (CGDirectDisplayID) -> UInt64
+    ) -> [DesktopKey] {
+        switch mode {
+        case .allDesktops:
+            applyShared(entry: entry, across: connectedDisplayIDs)
+            return connectedDisplayIDs.map { DesktopKey(displayID: $0) }
+        case .perDesktop:
+            if let displayID {
+                let space = spaceID ?? currentSpaceID(displayID)
+                let key = DesktopKey(displayID: displayID, spaceID: space)
+                setEntry(entry, for: key)
+                return [key]
+            }
+            return connectedDisplayIDs.map { id in
+                let key = DesktopKey(displayID: id, spaceID: currentSpaceID(id))
+                setEntry(entry, for: key)
+                return key
+            }
+        }
+    }
+
     /// Replace this state's entries and playback positions with `persisted`'s,
     /// but keep every Space we already saw from the live system snapshot.
     /// Used after `refreshManagedDisplaySpaces()` so loading persistence does

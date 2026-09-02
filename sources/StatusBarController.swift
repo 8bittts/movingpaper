@@ -33,277 +33,99 @@ final class StatusBarController: NSObject {
 
     private func rebuildMenu(into menu: NSMenu) {
         menu.removeAllItems()
-
-        // Show download progress if active
-        if case .downloading(let progress) = wallpaperManager.youtubeDownloader.state {
-            let pct = Int(progress * 100)
-            let progressItem = NSMenuItem(title: "Downloading: \(pct)%…", action: nil, keyEquivalent: "")
-            progressItem.isEnabled = false
-            menu.addItem(progressItem)
-
-            let cancelItem = NSMenuItem(
-                title: "Cancel Download",
-                action: #selector(cancelDownload),
-                keyEquivalent: ""
-            )
-            cancelItem.target = self
-            menu.addItem(cancelItem)
-            menu.addItem(.separator())
-        }
-
-        switch wallpaperManager.mode {
-        case .allDesktops:
-            buildAllDesktopsMenu(menu)
-        case .perDesktop:
-            buildPerDesktopMenu(menu)
-        }
-
-        menu.addItem(.separator())
-
-        // ── Sound toggle ──
-        // The state is spelled out in the label (HIG's changing-state style), so
-        // no checkmark — a checkmark alongside "Sound: On" would double-signal.
-        // No key equivalent: an accessory status-menu shortcut only fires while
-        // the menu is open, so advertising ⌘S here is misleading.
-        let soundTitle = wallpaperManager.isMuted ? "Sound: Off" : "Sound: On"
-        let soundItem = NSMenuItem(
-            title: soundTitle,
-            action: #selector(toggleMute),
-            keyEquivalent: ""
-        )
-        soundItem.target = self
-        menu.addItem(soundItem)
-
-        // ── Mode toggle ──
-        let modeMenu = NSMenu()
-
-        let allItem = NSMenuItem(
-            title: "All Desktops",
-            action: #selector(setModeAllDesktops),
-            keyEquivalent: ""
-        )
-        allItem.target = self
-        allItem.state = wallpaperManager.mode == .allDesktops ? .on : .off
-        modeMenu.addItem(allItem)
-
-        let perItem = NSMenuItem(
-            title: "Per Desktop",
-            action: #selector(setModePerDesktop),
-            keyEquivalent: ""
-        )
-        perItem.target = self
-        perItem.state = wallpaperManager.mode == .perDesktop ? .on : .off
-        modeMenu.addItem(perItem)
-
-        let modeItem = NSMenuItem(title: "MovingPaper Mode", action: nil, keyEquivalent: "")
-        modeItem.submenu = modeMenu
-        menu.addItem(modeItem)
-
-        menu.addItem(.separator())
-
-        // ── Pause / Resume ──
-        if wallpaperManager.hasAnyWallpaper {
-            let pauseTitle = wallpaperManager.isPaused ? "Resume" : "Pause"
-            let pauseItem = NSMenuItem(
-                title: pauseTitle,
-                action: #selector(togglePause),
-                keyEquivalent: ""
-            )
-            pauseItem.target = self
-            menu.addItem(pauseItem)
-
-            menu.addItem(.separator())
-        }
-
-        // ── Check for Updates ──
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
-        let updateTitle = version.isEmpty ? "Check for Updates…" : "Check for Updates (v\(version))…"
-        let updateItem = NSMenuItem(
-            title: updateTitle,
-            action: #selector(checkForUpdates),
-            keyEquivalent: ""
+        let rows = MenuSnapshot.rows(
+            from: wallpaperManager.menuInput(
+                appVersion: version,
+                canCheckForUpdates: updater.canCheckForUpdates
+            )
         )
-        updateItem.target = self
-        updateItem.isEnabled = updater.canCheckForUpdates
-        menu.addItem(updateItem)
-
-        // ── Built with YEN ──
-        let yenItem = NSMenuItem(
-            title: "Built with YEN",
-            action: #selector(openYEN),
-            keyEquivalent: ""
-        )
-        yenItem.target = self
-        menu.addItem(yenItem)
-
-        menu.addItem(.separator())
-
-        // ── Quit ──
-        let quitItem = NSMenuItem(
-            title: "Quit MovingPaper",
-            action: #selector(quit),
-            keyEquivalent: "q"
-        )
-        quitItem.target = self
-        menu.addItem(quitItem)
+        append(rows, to: menu)
     }
 
-    // MARK: - All Displays Mode Menu
-
-    private func buildAllDesktopsMenu(_ menu: NSMenu) {
-        if let url = wallpaperManager.sharedFileURL {
-            let fileItem = NSMenuItem(
-                title: MenuBarLabelFormatter.sharedWallpaperTitle(fileName: url.lastPathComponent),
-                action: nil,
-                keyEquivalent: ""
-            )
-            fileItem.isEnabled = false
-            menu.addItem(fileItem)
-            menu.addItem(.separator())
-
-            let removeItem = NSMenuItem(
-                title: "Remove MovingPaper",
-                action: #selector(clearAllWallpapers),
-                keyEquivalent: ""
-            )
-            removeItem.target = self
-            menu.addItem(removeItem)
-
-            menu.addItem(.separator())
-        }
-
-        let chooseItem = NSMenuItem(
-            title: "Choose File…",
-            action: #selector(chooseFileForAll),
-            keyEquivalent: ""
-        )
-        chooseItem.target = self
-        menu.addItem(chooseItem)
-
-        let youtubeItem = NSMenuItem(
-            title: "Paste YouTube URL…",
-            action: #selector(pasteYouTubeURLForAll),
-            keyEquivalent: ""
-        )
-        youtubeItem.target = self
-        menu.addItem(youtubeItem)
-
-        let photosItem = NSMenuItem(
-            title: "Choose from Photos…",
-            action: #selector(chooseFromPhotosForAll),
-            keyEquivalent: ""
-        )
-        photosItem.target = self
-        menu.addItem(photosItem)
-
-        let shuffleItem = NSMenuItem(
-            title: "Shuffle from Photos",
-            action: #selector(shuffleFromPhotosForAll),
-            keyEquivalent: ""
-        )
-        shuffleItem.target = self
-        menu.addItem(shuffleItem)
-    }
-
-    // MARK: - Per Display Mode Menu
-
-    private func buildPerDesktopMenu(_ menu: NSMenu) {
-        let displays = wallpaperManager.connectedDisplays
-
-        if displays.isEmpty {
-            let noDisplays = NSMenuItem(title: "No Displays", action: nil, keyEquivalent: "")
-            noDisplays.isEnabled = false
-            menu.addItem(noDisplays)
-            return
-        }
-
-        for (displayIndex, display) in displays.enumerated() {
-            // Show display name only if multiple monitors
-            if displays.count > 1 {
-                let displayHeader = NSMenuItem.sectionHeader(
-                    title: MenuBarLabelFormatter.displayHeaderTitle(display.name)
-                )
-                menu.addItem(displayHeader)
-            }
-
-            let spaces = wallpaperManager.spaceAssignments(for: display.id)
-
-            for (index, space) in spaces.enumerated() {
-                let hasWallpaper = space.fileName != nil
-                let label = MenuBarLabelFormatter.desktopWallpaperTitle(
-                    index: index + 1,
-                    fileName: space.fileName ?? "No MovingPaper"
-                )
-                let item = NSMenuItem(title: label, action: nil, keyEquivalent: "")
-                if space.isCurrent {
-                    item.state = .on
-                }
-
-                let sub = NSMenu()
-                if space.isCurrent {
-                    buildDisplaySubmenu(sub, displayID: display.id, includeRemove: hasWallpaper)
-                } else {
-                    let info = NSMenuItem(title: "Switch to this desktop to change", action: nil, keyEquivalent: "")
-                    info.isEnabled = false
-                    sub.addItem(info)
-                }
-                item.submenu = sub
-                menu.addItem(item)
-            }
-
-            if displayIndex < displays.count - 1 {
-                menu.addItem(.separator())
-            }
-        }
-
-        if wallpaperManager.hasAnyWallpaper {
-            menu.addItem(.separator())
-            let clearAllItem = NSMenuItem(
-                title: "Remove All MovingPapers",
-                action: #selector(clearAllWallpapers),
-                keyEquivalent: ""
-            )
-            clearAllItem.target = self
-            menu.addItem(clearAllItem)
+    private func append(_ rows: [MenuRow], to menu: NSMenu) {
+        for row in rows {
+            menu.addItem(makeItem(row))
         }
     }
 
-    // MARK: - Submenu Builder
+    private func makeItem(_ row: MenuRow) -> NSMenuItem {
+        switch row {
+        case .disabled(let title):
+            let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            return item
+        case .separator:
+            return .separator()
+        case .sectionHeader(let title):
+            return NSMenuItem.sectionHeader(title: title)
+        case .command(let command):
+            return makeCommandItem(command)
+        case .submenu(let title, let rows):
+            let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            item.submenu = makeSubmenu(rows)
+            return item
+        case .item(let title, let checked, let children):
+            let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            item.state = checked ? .on : .off
+            item.submenu = makeSubmenu(children)
+            return item
+        }
+    }
 
-    private func buildDisplaySubmenu(_ menu: NSMenu, displayID: CGDirectDisplayID, includeRemove: Bool) {
-        let tag = Int(displayID)
-        for (title, action) in [
-            ("Choose File…", #selector(chooseFileForDisplay(_:))),
-            ("Paste YouTube URL…", #selector(pasteYouTubeURLForDisplay(_:))),
-            ("Choose from Photos…", #selector(chooseFromPhotosForDisplay(_:))),
-            ("Shuffle from Photos", #selector(shuffleFromPhotosForDisplay(_:))),
-        ] {
-            let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
-            item.target = self
-            item.tag = tag
-            menu.addItem(item)
+    private func makeSubmenu(_ rows: [MenuRow]) -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        append(rows, to: menu)
+        return menu
+    }
+
+    private func makeCommandItem(_ command: MenuCommand) -> NSMenuItem {
+        let item = NSMenuItem(
+            title: command.title,
+            action: selector(for: command.id),
+            keyEquivalent: command.keyEquivalent
+        )
+        item.target = self
+        item.isEnabled = command.enabled
+        item.state = command.checked ? .on : .off
+        if let displayID = command.displayID {
+            item.tag = Int(displayID)
         }
-        if includeRemove {
-            let item = NSMenuItem(title: "Remove", action: #selector(clearDisplayWallpaper(_:)), keyEquivalent: "")
-            item.target = self
-            item.tag = tag
-            menu.addItem(item)
+        return item
+    }
+
+    private func selector(for id: MenuCommandID) -> Selector {
+        switch id {
+        case .cancelDownload: #selector(cancelDownload)
+        case .chooseFile: #selector(chooseFile(_:))
+        case .pasteYouTube: #selector(pasteYouTube(_:))
+        case .choosePhotos: #selector(choosePhotos(_:))
+        case .shufflePhotos: #selector(shufflePhotos(_:))
+        case .clearAll: #selector(clearAllWallpapers)
+        case .clearDisplay: #selector(clearDisplayWallpaper(_:))
+        case .toggleMute: #selector(toggleMute)
+        case .togglePause: #selector(togglePause)
+        case .setModeAllDesktops: #selector(setModeAllDesktops)
+        case .setModePerDesktop: #selector(setModePerDesktop)
+        case .checkForUpdates: #selector(checkForUpdates)
+        case .openYEN: #selector(openYEN)
+        case .quit: #selector(quit)
         }
+    }
+
+    private func optionalDisplayID(_ sender: NSMenuItem) -> CGDirectDisplayID? {
+        sender.tag == 0 ? nil : CGDirectDisplayID(sender.tag)
     }
 
     // MARK: - Actions
 
-    @objc private func chooseFileForAll() {
-        wallpaperManager.selectFile()
-    }
-
-    @objc private func chooseFileForDisplay(_ sender: NSMenuItem) {
-        let displayID = CGDirectDisplayID(sender.tag)
-        wallpaperManager.selectFile(for: displayID)
+    @objc private func chooseFile(_ sender: NSMenuItem) {
+        wallpaperManager.selectFile(for: optionalDisplayID(sender))
     }
 
     @objc private func clearDisplayWallpaper(_ sender: NSMenuItem) {
-        let displayID = CGDirectDisplayID(sender.tag)
+        guard let displayID = optionalDisplayID(sender) else { return }
         wallpaperManager.clearWallpaper(for: displayID)
     }
 
@@ -327,21 +149,14 @@ final class StatusBarController: NSObject {
         wallpaperManager.setMode(.perDesktop)
     }
 
-    @objc private func pasteYouTubeURLForAll() {
+    @objc private func pasteYouTube(_ sender: NSMenuItem) {
         let urlString = promptForYouTubeURL()
         guard let urlString else { return }
-        wallpaperManager.setYouTubeWallpaper(urlString: urlString)
-    }
-
-    @objc private func pasteYouTubeURLForDisplay(_ sender: NSMenuItem) {
-        let urlString = promptForYouTubeURL()
-        guard let urlString else { return }
-        let displayID = CGDirectDisplayID(sender.tag)
-        wallpaperManager.setYouTubeWallpaper(urlString: urlString, for: displayID)
+        wallpaperManager.setYouTubeWallpaper(urlString: urlString, for: optionalDisplayID(sender))
     }
 
     @objc private func cancelDownload() {
-        wallpaperManager.youtubeDownloader.cancel()
+        wallpaperManager.cancelDownload()
     }
 
     private func promptForYouTubeURL() -> String? {
@@ -369,12 +184,8 @@ final class StatusBarController: NSObject {
         }
     }
 
-    @objc private func chooseFromPhotosForAll() {
-        presentPhotosPicker(for: nil)
-    }
-
-    @objc private func chooseFromPhotosForDisplay(_ sender: NSMenuItem) {
-        presentPhotosPicker(for: CGDirectDisplayID(sender.tag))
+    @objc private func choosePhotos(_ sender: NSMenuItem) {
+        presentPhotosPicker(for: optionalDisplayID(sender))
     }
 
     /// Foreground the app, run the Photos picker, and assign the pick (nil display = all).
@@ -389,13 +200,8 @@ final class StatusBarController: NSObject {
         }
     }
 
-    @objc private func shuffleFromPhotosForAll() {
-        wallpaperManager.shuffleFromPhotos()
-    }
-
-    @objc private func shuffleFromPhotosForDisplay(_ sender: NSMenuItem) {
-        let displayID = CGDirectDisplayID(sender.tag)
-        wallpaperManager.shuffleFromPhotos(for: displayID)
+    @objc private func shufflePhotos(_ sender: NSMenuItem) {
+        wallpaperManager.shuffleFromPhotos(for: optionalDisplayID(sender))
     }
 
     @objc private func checkForUpdates() {

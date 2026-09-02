@@ -122,6 +122,82 @@ struct WallpaperStateTests {
         #expect(state.knownSpaces[displayB] == Set([42]))
     }
 
+    @Test func assignAllDesktopsPinsTheEntryOnEveryConnectedDisplay() {
+        var state = WallpaperState()
+        let entry = WallpaperEntry(localURL: localURL, youtubeOrigin: "https://yt")
+        let keys = state.assign(
+            entry,
+            mode: .allDesktops,
+            displayID: displayA,
+            spaceID: 9,
+            connectedDisplayIDs: [displayA, displayB],
+            currentSpaceID: { _ in 99 }
+        )
+
+        #expect(Set(keys) == [
+            DesktopKey(displayID: displayA),
+            DesktopKey(displayID: displayB),
+        ])
+        #expect(state.entries[DesktopKey(displayID: displayA)] == entry)
+        #expect(state.entries[DesktopKey(displayID: displayB)] == entry)
+        #expect(state.knownSpaces.isEmpty)
+    }
+
+    @Test func assignPerDesktopUsesTheGivenDisplayAndSpace() {
+        var state = WallpaperState()
+        let entry = WallpaperEntry(localURL: localURL, youtubeOrigin: nil)
+        let keys = state.assign(
+            entry,
+            mode: .perDesktop,
+            displayID: displayA,
+            spaceID: 7,
+            connectedDisplayIDs: [displayA, displayB],
+            currentSpaceID: { _ in 99 }
+        )
+
+        #expect(keys == [DesktopKey(displayID: displayA, spaceID: 7)])
+        #expect(state.entries[DesktopKey(displayID: displayA, spaceID: 7)] == entry)
+        #expect(state.entries[DesktopKey(displayID: displayB, spaceID: 99)] == nil)
+        #expect(state.knownSpaces[displayA] == Set([7]))
+    }
+
+    @Test func assignPerDesktopFallsBackToTheCurrentSpaceWhenSpaceIDIsOmitted() {
+        var state = WallpaperState()
+        let entry = WallpaperEntry(localURL: localURL, youtubeOrigin: nil)
+        let keys = state.assign(
+            entry,
+            mode: .perDesktop,
+            displayID: displayA,
+            spaceID: nil,
+            connectedDisplayIDs: [displayA],
+            currentSpaceID: { _ in 15 }
+        )
+
+        #expect(keys == [DesktopKey(displayID: displayA, spaceID: 15)])
+        #expect(state.entries[DesktopKey(displayID: displayA, spaceID: 15)] == entry)
+    }
+
+    @Test func assignPerDesktopForAllAppliesEveryConnectedDisplayCurrentSpace() {
+        var state = WallpaperState()
+        let entry = WallpaperEntry(localURL: localURL, youtubeOrigin: nil)
+        let keys = state.assign(
+            entry,
+            mode: .perDesktop,
+            displayID: nil,
+            spaceID: 0,
+            connectedDisplayIDs: [displayA, displayB],
+            currentSpaceID: { $0 == displayA ? 100 : 200 }
+        )
+
+        #expect(Set(keys) == [
+            DesktopKey(displayID: displayA, spaceID: 100),
+            DesktopKey(displayID: displayB, spaceID: 200),
+        ])
+        #expect(state.entries[DesktopKey(displayID: displayA, spaceID: 100)] == entry)
+        #expect(state.entries[DesktopKey(displayID: displayB, spaceID: 200)] == entry)
+        #expect(state.entries[DesktopKey(displayID: displayA)] == nil)
+    }
+
     @Test func migrateToPerDesktopRekeysExistingAssignmentsToTheActiveSpace() {
         var state = WallpaperState()
         let entry = WallpaperEntry(localURL: localURL, youtubeOrigin: nil)

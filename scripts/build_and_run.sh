@@ -21,18 +21,8 @@ SPARKLE_SOURCE="${REPO_ROOT}/tools/sparkle/Sparkle.framework"
 SPARKLE_FEED_URL="${SPARKLE_FEED_URL:-https://github.com/8bittts/movingpaper/releases/latest/download/appcast.xml}"
 SPARKLE_PUBLIC_ED_KEY="${SPARKLE_PUBLIC_ED_KEY:-0Gr0zoQweDjkOPIj9VSnNZzlTSTrnHlHnAIcwaXbmkU=}"
 
-plist_set() {
-    local plist="$1"
-    local key="$2"
-    local type="$3"
-    local value="$4"
-
-    if /usr/libexec/PlistBuddy -c "Print :${key}" "$plist" >/dev/null 2>&1; then
-        /usr/libexec/PlistBuddy -c "Set :${key} ${value}" "$plist"
-    else
-        /usr/libexec/PlistBuddy -c "Add :${key} ${type} ${value}" "$plist"
-    fi
-}
+# shellcheck source=lib/plist.sh
+source "${REPO_ROOT}/scripts/lib/plist.sh"
 
 open_app() {
     /usr/bin/open -n "$APP_BUNDLE"
@@ -84,12 +74,7 @@ plist_set "$INFO_PLIST" "CFBundleIconFile" string "$APP_NAME"
 plist_set "$INFO_PLIST" "NSPrincipalClass" string "NSApplication"
 # Local staged app bundles mirror release updater defaults so Sparkle behavior
 # matches distribution builds during manual verification.
-plist_set "$INFO_PLIST" "SUEnableAutomaticChecks" bool true
-plist_set "$INFO_PLIST" "SUFeedURL" string "$SPARKLE_FEED_URL"
-plist_set "$INFO_PLIST" "SUPublicEDKey" string "$SPARKLE_PUBLIC_ED_KEY"
-plist_set "$INFO_PLIST" "SUScheduledCheckInterval" integer 3600
-plist_set "$INFO_PLIST" "SUVerifyUpdateBeforeExtraction" bool true
-plist_set "$INFO_PLIST" "SURequireSignedFeed" bool true
+apply_sparkle_plist_keys "$INFO_PLIST" "$SPARKLE_FEED_URL" "$SPARKLE_PUBLIC_ED_KEY"
 
 case "$MODE" in
     --build-only|build-only)

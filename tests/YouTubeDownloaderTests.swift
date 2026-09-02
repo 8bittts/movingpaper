@@ -18,6 +18,13 @@ struct YouTubeDownloaderTests {
     @Test func pinnedYTDLPVersionAndHashAreNotEmpty() {
         #expect(!YouTubeDownloader.pinnedYTDLPVersion.isEmpty)
         #expect(YouTubeDownloader.pinnedYTDLPSHA256.count == 64)
+        #expect(YouTubeDownloader.pinnedYTDLPVersion == YTDLPInstaller.pinnedVersion)
+        #expect(YouTubeDownloader.pinnedYTDLPSHA256 == YTDLPInstaller.pinnedSHA256)
+    }
+
+    @Test func installerHashMatchesDownloaderAlias() {
+        let data = Data("abc".utf8)
+        #expect(YTDLPInstaller.sha256Hex(of: data) == YouTubeDownloader.sha256Hex(of: data))
     }
 
     @Test @MainActor func invalidURLReturnsFailureOutcomeNotSuccess() async {
