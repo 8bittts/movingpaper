@@ -16,8 +16,11 @@ final class WallpaperPanel: NSPanel {
         let desktopLevel = CGWindowLevelForKey(.desktopWindow)
         self.level = NSWindow.Level(rawValue: Int(desktopLevel) + 1)
 
+        // Not opaque so HEVC-with-alpha and transparent GIFs still composite.
+        // Black fill hides the system desktop during the first-frame wait so
+        // a load hitch cannot flash through the panel.
         self.isOpaque = false
-        self.backgroundColor = .clear
+        self.backgroundColor = .black
         self.hasShadow = false
         self.isMovable = false
         self.ignoresMouseEvents = true

@@ -16,10 +16,15 @@ final class WallpaperWindowController {
     let panel: WallpaperPanel
     private(set) var screen: NSScreen
     private(set) var currentURL: URL?
-    /// Direct reference to the video player for position save/restore and mute.
-    var player: AVQueuePlayer?
     private var contentView: NSView?
     private var occlusionObserver: Any?
+    private var occlusionHidden = false
+    private var powerSuspended = false
+
+    /// Live video player hosted in the content view, if this panel is showing video.
+    var player: AVQueuePlayer? {
+        (contentView as? VideoPlayerNSView)?.player
+    }
 
     init(screen: NSScreen) {
         self.screen = screen
@@ -39,10 +44,8 @@ final class WallpaperWindowController {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                Self.applyOcclusion(
-                    isVisible: self.panel.occlusionState.contains(.visible),
-                    to: self.contentView as? OcclusionPausable
-                )
+                self.occlusionHidden = !self.panel.occlusionState.contains(.visible)
+                self.applyPlaybackState()
             }
         }
     }
@@ -53,6 +56,20 @@ final class WallpaperWindowController {
     /// policy is unit-testable without the window server.
     static func applyOcclusion(isVisible: Bool, to pausable: OcclusionPausable?) {
         pausable?.setOcclusionHidden(!isVisible)
+    }
+
+    func setPowerSuspended(_ suspended: Bool) {
+        powerSuspended = suspended
+        applyPlaybackState()
+    }
+
+    func setMuted(_ muted: Bool) {
+        (contentView as? VideoPlayerNSView)?.setMuted(muted)
+    }
+
+    private func applyPlaybackState() {
+        let pausable = contentView as? OcclusionPausable
+        Self.applyOcclusion(isVisible: !occlusionHidden && !powerSuspended, to: pausable)
     }
 
     /// Install an AppKit view as the wallpaper content for this panel.
@@ -67,6 +84,8 @@ final class WallpaperWindowController {
         self.contentView = view
 
         panel.orderFront(nil)
+        occlusionHidden = !panel.occlusionState.contains(.visible)
+        applyPlaybackState()
     }
 
     func reposition(to newScreen: NSScreen) {

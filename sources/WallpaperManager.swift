@@ -48,8 +48,12 @@ final class WallpaperManager {
     /// the download finishes; dropped when resolved or the desktop is cleared.
     private var pendingRedownloads: [DesktopKey: WallpaperRedownloadRequest] = [:]
     private(set) var activeSpaceIDs: [CGDirectDisplayID: UInt64] = [:]
+    private var lastPlaybackFailurePath: String?
 
     init() {
+        router.onPlaybackFailure = { [weak self] url, message in
+            self?.handlePlaybackFailure(url: url, message: message)
+        }
         refreshManagedDisplaySpaces()
         restoreState()
         observeScreenChanges()
@@ -281,6 +285,14 @@ final class WallpaperManager {
         AppPresentation.showWarningAlert(title: title, message: message)
     }
 
+    private func handlePlaybackFailure(url: URL, message: String) {
+        let path = url.path(percentEncoded: false)
+        Log.playback.error("Playback failed for \(path, privacy: .public): \(message, privacy: .public)")
+        guard lastPlaybackFailurePath != path else { return }
+        lastPlaybackFailurePath = path
+        showAlert(title: "Playback Failed", message: message)
+    }
+
     // MARK: - Photos Shuffle
 
     /// Pick a random video from the entire Photos library and set it as wallpaper.
@@ -436,6 +448,7 @@ final class WallpaperManager {
 
         restoreTask = Task { @MainActor [weak self] in
             guard let self else { return }
+            var failedCount = 0
 
             for item in items {
                 let key = item.key
@@ -447,6 +460,7 @@ final class WallpaperManager {
 
                 guard case .success(let localURL) = await youtubeDownloader.download(youtubeURL: youtubeURL) else {
                     guard !Task.isCancelled else { return }
+                    failedCount += 1
                     continue
                 }
 
@@ -463,6 +477,13 @@ final class WallpaperManager {
                 rebuildAllWindows()
             }
 
+            if failedCount > 0 {
+                let message = failedCount == 1
+                    ? "A YouTube wallpaper could not be redownloaded."
+                    : "\(failedCount) YouTube wallpapers could not be redownloaded."
+                showAlert(title: "Couldn't Restore Some Wallpapers", message: message)
+            }
+
             restoreTask = nil
         }
     }
@@ -470,7 +491,7 @@ final class WallpaperManager {
     // MARK: - Window Lifecycle
 
     func rebuildAllWindows() {
-        guard !isPaused, !systemPaused else {
+        guard !isPaused else {
             tearDownWindows()
             return
         }
@@ -486,6 +507,7 @@ final class WallpaperManager {
                 resumeTime: state.playbackPositions[key]
             )
         }
+        router.setPlaybackSuspended(systemPaused)
     }
 
     func tearDown() {
@@ -579,14 +601,13 @@ final class WallpaperManager {
     }
 
     private func applyPowerVerdict(shouldPause: Bool) {
-        if shouldPause && !systemPaused {
-            systemPaused = true
-            tearDownWindows()
-        } else if !shouldPause && systemPaused {
-            systemPaused = false
-            if !isPaused {
-                rebuildAllWindows()
-            }
+        guard shouldPause != systemPaused else { return }
+        systemPaused = shouldPause
+        guard !isPaused else { return }
+        if shouldPause {
+            router.setPlaybackSuspended(true)
+        } else {
+            rebuildAllWindows()
         }
     }
 

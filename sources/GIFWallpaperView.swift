@@ -4,15 +4,16 @@ import ImageIO
 /// AppKit view that renders animated GIF frames into a `CALayer` via
 /// `CGAnimateImageAtURLWithBlock`. The system handles frame timing from the
 /// GIF's delay metadata automatically.
+@MainActor
 final class GIFAnimationNSView: NSView {
     private var imageLayer: CALayer?
     /// The GIF currently loaded, so occlusion resume can restart it.
     private(set) var currentURL: URL?
+    var onFailure: ((URL, String) -> Void)?
 
-    // The animation callback runs on a background thread, so the "is this
-    // animation still current?" flag must be read/written under a lock. Each
-    // `loadGIF`/`stopAnimation` bumps the generation; a callback whose captured
-    // token no longer matches stops itself, preventing a stale second loop.
+    // The animation callback is documented to run on the main queue, but we
+    // still treat generation as cross-thread so a late callback cannot restart
+    // a stopped loop.
     private let stateLock = NSLock()
     nonisolated(unsafe) private var generation = 0
 
@@ -45,43 +46,78 @@ final class GIFAnimationNSView: NSView {
         fatalError()
     }
 
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        imageLayer?.contentsScale = scale
+    }
+
     override func layout() {
         super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         imageLayer?.frame = bounds
+        CATransaction.commit()
     }
 
     func loadGIF(url: URL) {
         currentURL = url
-        imageLayer?.contents = nil
         let token = bumpGeneration()
-
-        _ = CGAnimateImageAtURLWithBlock(
+        // Wallpaper GIFs must loop even when the file's Netscape count is 1.
+        let options: NSDictionary = [kCGImageAnimationLoopCount: Double.infinity]
+        let status = CGAnimateImageAtURLWithBlock(
             url as CFURL,
-            nil
+            options
         ) { [weak self] _, cgImage, stop in
             guard let self, self.isCurrent(token) else {
                 stop.pointee = true
                 return
             }
-            if Thread.isMainThread {
-                self.imageLayer?.contents = cgImage
-            } else {
-                DispatchQueue.main.async { [weak self] in
-                    guard let self, self.isCurrent(token) else { return }
-                    self.imageLayer?.contents = cgImage
-                }
-            }
+            self.displayFrame(cgImage)
+        }
+        if status != noErr {
+            currentURL = nil
+            onFailure?(url, Self.playbackMessage(status: status))
         }
     }
 
+    /// Present a frame without CALayer's implicit fade (which looks like tearing).
+    /// ImageIO calls the animation block on the main queue.
+    func displayFrame(_ image: CGImage) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        imageLayer?.contents = image
+        CATransaction.commit()
+    }
+
+    var hasVisibleContents: Bool { imageLayer?.contents != nil }
+
     func stopAnimation() {
         _ = bumpGeneration()
-        imageLayer?.contents = nil
+        // Keep the last frame up so occlusion/power pause does not flash the
+        // desktop through an empty layer.
     }
 
     override func removeFromSuperview() {
         stopAnimation()
         super.removeFromSuperview()
+    }
+
+    static func playbackMessage(status: OSStatus) -> String {
+        switch status {
+        case CGImageAnimationStatus.parameterError.rawValue:
+            return "The GIF could not be opened."
+        case CGImageAnimationStatus.corruptInputImage.rawValue:
+            return "The GIF file is unreadable."
+        case CGImageAnimationStatus.unsupportedFormat.rawValue:
+            return "That image format cannot be animated."
+        case CGImageAnimationStatus.incompleteInputImage.rawValue:
+            return "The GIF file is incomplete."
+        case CGImageAnimationStatus.allocationFailure.rawValue:
+            return "Not enough memory to play that GIF."
+        default:
+            return "The GIF could not be played."
+        }
     }
 }
 
@@ -91,8 +127,8 @@ extension GIFAnimationNSView: OcclusionPausable {
             stopAnimation()
         } else if let currentURL {
             // CGAnimateImageAtURLWithBlock has no resume-at-frame API, so a revealed
-            // GIF restarts from the first frame — imperceptible for a wallpaper that
-            // was fully occluded while paused.
+            // GIF restarts from the first frame — the last frame stays visible until
+            // the first new callback arrives.
             loadGIF(url: currentURL)
         }
     }

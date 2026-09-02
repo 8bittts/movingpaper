@@ -58,6 +58,7 @@ final class WallpaperWindowRouter {
 
     private var controllers: [CGDirectDisplayID: WallpaperWindowController] = [:]
     private(set) var isMuted: Bool = true
+    var onPlaybackFailure: ((URL, String) -> Void)?
 
     init(isMuted: Bool = true) {
         self.isMuted = isMuted
@@ -96,8 +97,13 @@ final class WallpaperWindowRouter {
                     controllers[id] = makeController(screen: screen, plan: plan)
                 }
             case .replace(let id):
-                controllers[id]?.close()
-                if let screen = screensByID[id], let plan = plansByID[id] {
+                // Keep the existing panel so the desktop does not flash through
+                // while the new clip loads.
+                if let screen = screensByID[id], let plan = plansByID[id], let existing = controllers[id] {
+                    existing.reposition(to: screen)
+                    install(plan, in: existing)
+                } else if let screen = screensByID[id], let plan = plansByID[id] {
+                    controllers[id]?.close()
                     controllers[id] = makeController(screen: screen, plan: plan)
                 }
             }
@@ -107,7 +113,13 @@ final class WallpaperWindowRouter {
     func setMuted(_ muted: Bool) {
         isMuted = muted
         for controller in controllers.values {
-            controller.player?.isMuted = muted
+            controller.setMuted(muted)
+        }
+    }
+
+    func setPlaybackSuspended(_ suspended: Bool) {
+        for controller in controllers.values {
+            controller.setPowerSuspended(suspended)
         }
     }
 
@@ -140,18 +152,24 @@ final class WallpaperWindowRouter {
 
     private func makeController(screen: NSScreen, plan: Plan) -> WallpaperWindowController {
         let controller = WallpaperWindowController(screen: screen)
+        install(plan, in: controller)
+        return controller
+    }
+
+    private func install(_ plan: Plan, in controller: WallpaperWindowController) {
+        let frame = controller.panel.contentView?.bounds ?? controller.screen.frame
         switch plan.type {
         case .video:
-            let videoView = VideoPlayerNSView()
-            videoView.loadVideo(url: plan.url, resumeTime: plan.resumeTime)
+            let videoView = VideoPlayerNSView(frame: frame)
+            videoView.onFailure = onPlaybackFailure
             videoView.setMuted(isMuted)
             controller.show(videoView, url: plan.url)
-            controller.player = videoView.player
+            videoView.loadVideo(url: plan.url, resumeTime: plan.resumeTime)
         case .gif:
-            let gifView = GIFAnimationNSView()
-            gifView.loadGIF(url: plan.url)
+            let gifView = GIFAnimationNSView(frame: frame)
+            gifView.onFailure = onPlaybackFailure
             controller.show(gifView, url: plan.url)
+            gifView.loadGIF(url: plan.url)
         }
-        return controller
     }
 }
