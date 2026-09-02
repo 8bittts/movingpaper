@@ -66,7 +66,7 @@ Plays a looping video or GIF as your desktop background. Everything on your desk
 | Source | How |
 |--------|-----|
 | **Video files** | `.mp4`, `.mov`, `.m4v` -- seamless looping, HEVC with alpha |
-| **GIFs** | `.gif` -- native frame timing |
+| **GIFs** | `.gif` -- native frame timing, loops continuously |
 | **YouTube** | Paste a YouTube URL -- downloads and loops as wallpaper |
 | **Apple Photos** | Pick a video or shuffle a random one from your library |
 
@@ -74,10 +74,11 @@ Plays a looping video or GIF as your desktop background. Everything on your desk
 
 - **Resilient async loading** -- stale YouTube and Photos results are cancelled or ignored so your newest wallpaper choice wins
 - **Loading overlay** -- on-brand shimmer pill floats above all windows so you always know what's happening
+- **Playback errors** -- missing or unreadable files show an alert instead of a blank desktop
 - **Per-desktop wallpapers** -- different wallpaper on each macOS Space and monitor, including separate Spaces per display
 - **Sound control** -- mute or unmute video audio (muted by default)
 - **Multi-monitor** -- auto-detects displays, adapts on hot-plug
-- **Power-aware** -- pauses on Low Power Mode and thermal throttling
+- **Power-aware** -- pauses in place on Low Power Mode and thermal throttling
 - **Automatic update checks** -- checks hourly via Sparkle using its standard updater dialog kept dockless (app-managed activation policy), with signed feeds and verify-before-extraction enabled in staged builds
 - **Persistent** -- your wallpapers come back when you relaunch
 - **Menu bar only** -- no Dock icon during normal use, update checks, or update install prompts
@@ -133,7 +134,12 @@ Don't have any videos or GIFs on-hand? The `build/tests/` folder ships with a fe
 
 ## How It Works
 
-A borderless `NSPanel` at `desktopWindow + 1` sits above the system wallpaper but below Finder icons. `ignoresMouseEvents = true` keeps the desktop interactive. Video loops via `AVQueuePlayer` + `AVPlayerLooper`. GIFs animate via `CGAnimateImageAtURLWithBlock`. Per-display Space changes are tracked from macOS's managed display-space snapshot, with a `CGSGetActiveSpace` fallback, so wallpaper swaps stay aligned with the correct monitor and desktop without visible flash.
+A borderless `NSPanel` at `desktopWindow + 1` sits above the system wallpaper but below Finder icons.
+`ignoresMouseEvents = true` keeps the desktop interactive.
+Video loops via `AVQueuePlayer` + `AVPlayerLooper`.
+GIFs animate via `CGAnimateImageAtURLWithBlock` and keep looping.
+Clip and Space changes reuse the on-screen panel so the system desktop does not flash through.
+Per-display Space changes are tracked from macOS's managed display-space snapshot, with a `CGSGetActiveSpace` fallback.
 
 ## Tech Stack
 
@@ -142,7 +148,7 @@ A borderless `NSPanel` at `desktopWindow + 1` sits above the system wallpaper bu
 | Build | Swift Package Manager |
 | Windowing | AppKit (`NSPanel`, `NSStatusItem`) |
 | UI | AppKit wallpaper views; SwiftUI only for the app lifecycle and loading overlay |
-| Video | AVFoundation (`AVQueuePlayer`, `AVPlayerLooper`) |
+| Video | AVFoundation (`AVQueuePlayer`, `AVPlayerLooper`, `AVPlayerLayer`) |
 | Photos | PhotosUI (`PHPickerViewController`) + PhotoKit (shuffle) |
 | GIF | ImageIO (`CGAnimateImageAtURLWithBlock`) |
 | Desktop tracking | CoreGraphics private APIs (`CGSCopyManagedDisplaySpaces`, `CGSGetActiveSpace`) |
