@@ -149,8 +149,8 @@ require_file "scripts/build-dmg.sh"
 require_executable "tools/sparkle/bin/sign_update"
 require_file "build/movingpaper.png"
 require_file "build/yen.png"
-require_file "build/tests/test-00.gif"
-require_file "build/tests/test-01.mp4"
+require_file "videos/test-00.gif"
+require_file "videos/test-01.mp4"
 
 if grep -q 'for item in "$BUILD_DIR"/\*' scripts/build-dmg.sh; then
     fail "build-dmg.sh contains broad build/ cleanup that can delete tracked sample assets"

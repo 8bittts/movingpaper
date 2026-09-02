@@ -128,7 +128,7 @@ Use `build_and_run.sh` for anything that touches Sparkle — it launches a fully
 
 Use `smoke-test.sh` before shipping changes. The default mode does not launch the wallpaper app; it runs the test suite, builds release, assembles a staged app bundle, and verifies core bundle shape. `--production` also requires and verifies the signed release app, signed and notarized DMG, checksum, and signed Sparkle appcast metadata.
 
-Don't have any videos or GIFs on-hand? The `build/tests/` folder ships with a few sample wallpapers you can load into MovingPaper to try it out. More will be added over time.
+Don't have any videos or GIFs on-hand? The `videos/` folder ships with ten sample wallpapers you can load into MovingPaper to try it out. More will be added over time.
 
 ---
 
