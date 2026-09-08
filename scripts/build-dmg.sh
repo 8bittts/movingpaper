@@ -138,8 +138,33 @@ can_notarize() {
         && xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1
 }
 
+# Guard against shipping a truncated Sparkle.framework (missing Updater.app
+# or XPC helpers) or a binary that drifted from tools/sparkle/VERSION.
+verify_sparkle_vendor() {
+    local version_file="tools/sparkle/VERSION"
+    [ -d "$SPARKLE_SOURCE" ] || fail "Sparkle.framework missing at ${SPARKLE_SOURCE}"
+    [ -f "$version_file" ] || fail "Missing ${version_file}; cannot verify vendored Sparkle"
+
+    # shellcheck disable=SC1090
+    source "$version_file"
+
+    local rel actual expected
+    for rel in "${required_paths[@]}"; do
+        [ -e "tools/sparkle/${rel}" ] \
+            || fail "Vendored Sparkle is missing ${rel} — re-vendor from sparkle_source"
+    done
+
+    expected="$sparkle_binary_sha256"
+    actual="$(shasum -a 256 "${SPARKLE_SOURCE}/Versions/B/Sparkle" | awk '{print $1}')"
+    if [ "$actual" != "$expected" ]; then
+        fail "Vendored Sparkle binary SHA-256 ${actual} does not match pin ${expected} (Sparkle ${sparkle_version}). Update tools/sparkle/VERSION if this re-vendor is intentional."
+    fi
+
+    step "Verified vendored Sparkle ${sparkle_version} (binary SHA-256 matches pin)"
+}
+
 [ -f "$SOURCE_PLIST" ] || fail "Source Info.plist not found at ${SOURCE_PLIST}"
-[ -d "$SPARKLE_SOURCE" ] || fail "Sparkle.framework missing at ${SPARKLE_SOURCE}"
+verify_sparkle_vendor
 
 CURRENT_VERSION="$(
     /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$SOURCE_PLIST"

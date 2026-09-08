@@ -152,7 +152,7 @@ Per-display Space changes are tracked from macOS's managed display-space snapsho
 | Photos | PhotosUI (`PHPickerViewController`) + PhotoKit (shuffle) |
 | GIF | ImageIO (`CGAnimateImageAtURLWithBlock`) |
 | Desktop tracking | CoreGraphics private APIs (`CGSCopyManagedDisplaySpaces`, `CGSGetActiveSpace`) |
-| Updates | [Sparkle](https://sparkle-project.org) 2.9.1 (EdDSA-signed feed, signed archives, signed-feed enforcement, verify-before-extraction, vendored) |
+| Updates | [Sparkle](https://sparkle-project.org) 2.9.6 (EdDSA-signed feed, signed archives, signed-feed enforcement, verify-before-extraction, vendored) |
 | Signing | Developer ID + Apple notarization |
 | Static analysis | [Periphery](https://github.com/peripheryapp/periphery) (unused code detection, see `.periphery.yml`) |
 | CI | GitHub Actions (`swift build` + `swift test --parallel` on every push/PR, see `.github/workflows/ci.yml`) |
