@@ -123,7 +123,7 @@ final class WallpaperManager {
     var hasAnyWallpaper: Bool { !state.isEmpty }
 
     /// Snapshot the status menu needs without exposing the downloader.
-    func menuInput(appVersion: String, canCheckForUpdates: Bool) -> MenuModelInput {
+    func menuInput(canCheckForUpdates: Bool, openAtLogin: Bool) -> MenuModelInput {
         let progress: Double?
         if case .downloading(let value) = youtubeDownloader.state {
             progress = value
@@ -138,7 +138,7 @@ final class WallpaperManager {
             hasAnyWallpaper: hasAnyWallpaper,
             sharedFileName: sharedFileURL?.lastPathComponent,
             canCheckForUpdates: canCheckForUpdates,
-            appVersion: appVersion,
+            openAtLogin: openAtLogin,
             displays: connectedDisplays.map { display in
                 DisplayMenuInput(
                     id: display.id,
@@ -226,7 +226,8 @@ final class WallpaperManager {
         guard WallpaperFileType.detect(for: url) != nil else {
             showAlert(
                 title: "Unsupported File",
-                message: "Choose a GIF or video file (.gif, .mp4, .mov, or .m4v)."
+                message: "Choose a GIF or video file (.gif, .mp4, .mov, or .m4v).",
+                style: .informational
             )
             return
         }
@@ -252,7 +253,11 @@ final class WallpaperManager {
     /// Download a YouTube video and set it as wallpaper.
     func setYouTubeWallpaper(urlString: String, for displayID: CGDirectDisplayID? = nil) {
         guard YouTubeURLParser.isYouTubeURL(urlString) else {
-            showAlert(title: "Invalid URL", message: "That doesn't look like a YouTube URL.")
+            showAlert(
+                title: "Invalid URL",
+                message: "That doesn't look like a YouTube URL.",
+                style: .informational
+            )
             return
         }
 
@@ -274,15 +279,19 @@ final class WallpaperManager {
                     youtubeOrigin: urlString
                 )
             case .failure(let msg):
-                showAlert(title: "Download Failed", message: msg)
+                showAlert(title: "Download Failed", message: msg, style: .warning)
             case .cancelled:
                 break
             }
         }
     }
 
-    private func showAlert(title: String, message: String) {
-        AppPresentation.showWarningAlert(title: title, message: message)
+    private func showAlert(
+        title: String,
+        message: String,
+        style: NSAlert.Style = .informational
+    ) {
+        AppPresentation.showAlert(title: title, message: message, style: style)
     }
 
     private func handlePlaybackFailure(url: URL, message: String) {
@@ -290,7 +299,7 @@ final class WallpaperManager {
         Log.playback.error("Playback failed for \(path, privacy: .public): \(message, privacy: .public)")
         guard lastPlaybackFailurePath != path else { return }
         lastPlaybackFailurePath = path
-        showAlert(title: "Playback Failed", message: message)
+        showAlert(title: "Playback Failed", message: message, style: .warning)
     }
 
     // MARK: - Photos Shuffle
@@ -303,17 +312,18 @@ final class WallpaperManager {
         requestCoordinator.start(for: target) { [weak self] token in
             guard let self else { return }
             loadingOverlay.show(message: "Shuffling…", on: screen(for: displayID))
-            guard let url = await photosService.randomVideoURL() else {
-                guard requestCoordinator.isCurrent(token, for: target) else { return }
-                loadingOverlay.hide()
-                AppPresentation.returnToAccessory()
-                showAlert(title: "No Videos Found", message: "Grant Photos access in System Settings or add videos to your library.")
-                return
-            }
+            let outcome = await photosService.shuffle()
             guard requestCoordinator.isCurrent(token, for: target) else { return }
             loadingOverlay.hide()
             AppPresentation.returnToAccessory()
-            applyWallpaper(url: url, for: displayID, spaceID: originSpaceID)
+            switch outcome {
+            case .video(let url):
+                applyWallpaper(url: url, for: displayID, spaceID: originSpaceID)
+            case .accessDenied, .noVideos, .exportFailed:
+                if let title = outcome.alertTitle, let message = outcome.alertMessage {
+                    showAlert(title: title, message: message, style: .informational)
+                }
+            }
         }
     }
 
@@ -481,7 +491,7 @@ final class WallpaperManager {
                 let message = failedCount == 1
                     ? "A YouTube wallpaper could not be redownloaded."
                     : "\(failedCount) YouTube wallpapers could not be redownloaded."
-                showAlert(title: "Couldn't Restore Some Wallpapers", message: message)
+                showAlert(title: "Couldn't Restore Some Wallpapers", message: message, style: .warning)
             }
 
             restoreTask = nil

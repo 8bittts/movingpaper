@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import SwiftUI
 
 // MARK: - Brand Palette (night sky)
@@ -28,6 +29,11 @@ struct LoadingOverlayView: View {
             shimmerText
             if let progress {
                 progressBar(value: progress)
+            } else {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(Brand.accent)
+                    .controlSize(.small)
             }
         }
         .padding(.horizontal, 28)
@@ -46,7 +52,7 @@ struct LoadingOverlayView: View {
     // is dropped and the text is shown statically at full brightness.
     private var shimmerText: some View {
         Text(message)
-            .font(.system(size: 13, weight: .semibold, design: .rounded))
+            .font(.system(.body, design: .rounded).weight(.semibold))
             .foregroundColor(reduceMotion ? Brand.textBright : Brand.textDim)
             .overlay {
                 if !reduceMotion {
@@ -57,7 +63,7 @@ struct LoadingOverlayView: View {
 
     private var textMask: some View {
         Text(message)
-            .font(.system(size: 13, weight: .semibold, design: .rounded))
+            .font(.system(.body, design: .rounded).weight(.semibold))
     }
 
     private var sheen: some View {
@@ -102,6 +108,8 @@ final class LoadingOverlayController {
     private var hostingView: NSHostingView<AnyView>?
     /// The display to center on (nil → main screen, for all-desktops changes).
     private var targetScreen: NSScreen?
+    /// Last VoiceOver key so percent ticks do not re-announce.
+    private var lastAnnouncedKey: String?
 
     func show(message: String, progress: Double? = nil, on screen: NSScreen? = nil) {
         targetScreen = screen
@@ -110,12 +118,11 @@ final class LoadingOverlayController {
         if let hostingView {
             hostingView.rootView = AnyView(content)
             resizePanel()
+            announceIfNeeded(message)
             return
         }
 
-        // First appearance of this overlay: announce it for VoiceOver, since the
-        // borderless nonactivating panel never takes focus on its own.
-        announce(message)
+        announceIfNeeded(message)
 
         let hosting = NSHostingView(rootView: AnyView(content))
         let size = hosting.fittingSize
@@ -132,7 +139,7 @@ final class LoadingOverlayController {
         window.hasShadow = false
         window.ignoresMouseEvents = true
         window.isReleasedWhenClosed = false
-        window.level = .screenSaver
+        window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
 
         hosting.frame = window.contentView!.bounds
@@ -141,12 +148,16 @@ final class LoadingOverlayController {
 
         centerOnScreen(window)
 
-        window.alphaValue = 0
         window.orderFront(nil)
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.3
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            window.animator().alphaValue = 1
+        if Self.reduceMotion {
+            window.alphaValue = 1
+        } else {
+            window.alphaValue = 0
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.3
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                window.animator().alphaValue = 1
+            }
         }
 
         self.panel = window
@@ -159,6 +170,12 @@ final class LoadingOverlayController {
         // instead of updating the one being faded out.
         self.panel = nil
         self.hostingView = nil
+        lastAnnouncedKey = nil
+        if Self.reduceMotion {
+            panel.orderOut(nil)
+            panel.close()
+            return
+        }
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.25
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
@@ -169,6 +186,18 @@ final class LoadingOverlayController {
                 panel.close()
             }
         })
+    }
+
+    private static var reduceMotion: Bool {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    }
+
+    /// Announce overlay copy when the *kind* of message changes, not every percent.
+    private func announceIfNeeded(_ message: String) {
+        let key = message.replacingOccurrences(of: #"\d+%"#, with: "%", options: .regularExpression)
+        guard key != lastAnnouncedKey else { return }
+        lastAnnouncedKey = key
+        announce(message)
     }
 
     /// Post a VoiceOver announcement for the transient overlay status. Best-effort

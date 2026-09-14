@@ -39,7 +39,7 @@ struct MenuSnapshotTests {
         input.displays = []
         let rows = MenuSnapshot.rows(from: input)
 
-        #expect(containsCommand(rows, id: .toggleMute, title: "Sound: On"))
+        #expect(containsCommand(rows, id: .toggleMute, title: "Turn Sound Off"))
         guard case .submenu(let title, let modeRows) = rows.first(where: {
             if case .submenu = $0 { return true }
             return false
@@ -113,20 +113,34 @@ struct MenuSnapshotTests {
         #expect(rows.contains(.sectionHeader("Studio Display")))
     }
 
-    @Test func updateTitleIncludesVersionAndHonorsTheEnabledFlag() {
+    @Test func updateTitleHonorsTheEnabledFlag() {
         var input = baseInput()
-        input.appVersion = "0.040"
         input.canCheckForUpdates = false
         let rows = MenuSnapshot.rows(from: input)
         let update = firstCommand(rows, id: .checkForUpdates)
-        #expect(update?.title == "Check for Updates (v0.040)…")
+        #expect(update?.title == "Check for Updates…")
         #expect(update?.enabled == false)
 
-        input.appVersion = ""
         input.canCheckForUpdates = true
-        let untitled = firstCommand(MenuSnapshot.rows(from: input), id: .checkForUpdates)
-        #expect(untitled?.title == "Check for Updates…")
-        #expect(untitled?.enabled == true)
+        let enabled = firstCommand(MenuSnapshot.rows(from: input), id: .checkForUpdates)
+        #expect(enabled?.title == "Check for Updates…")
+        #expect(enabled?.enabled == true)
+    }
+
+    @Test func footerPutsAboutAndOpenAtLoginNextToUpdates() {
+        var input = baseInput()
+        input.openAtLogin = true
+        let rows = MenuSnapshot.rows(from: input)
+        #expect(containsCommand(rows, id: .about, title: "About MovingPaper"))
+        let login = firstCommand(rows, id: .toggleOpenAtLogin)
+        #expect(login?.title == "Open at Login")
+        #expect(login?.checked == true)
+        #expect(commandTitles(rows).contains("Built with YEN") == false)
+    }
+
+    @Test func mutedStateOffersTurnSoundOn() {
+        let rows = MenuSnapshot.rows(from: baseInput())
+        #expect(containsCommand(rows, id: .toggleMute, title: "Turn Sound On"))
     }
 
     @Test func quitKeepsTheQKeyEquivalent() {
@@ -144,7 +158,7 @@ struct MenuSnapshotTests {
             hasAnyWallpaper: false,
             sharedFileName: nil,
             canCheckForUpdates: true,
-            appVersion: "0.040",
+            openAtLogin: false,
             displays: []
         )
     }
@@ -168,6 +182,21 @@ struct MenuSnapshotTests {
 
     private func containsCommand(_ rows: [MenuRow], id: MenuCommandID, title: String? = nil) -> Bool {
         firstCommand(rows, id: id).map { title == nil || $0.title == title } ?? false
+    }
+
+    private func commandTitles(_ rows: [MenuRow]) -> [String] {
+        rows.flatMap { row -> [String] in
+            switch row {
+            case .command(let command):
+                return [command.title]
+            case .submenu(let title, let children), .item(let title, _, let children):
+                return [title] + commandTitles(children)
+            case .disabled(let title), .sectionHeader(let title):
+                return [title]
+            case .separator:
+                return []
+            }
+        }
     }
 
     private func firstCommand(_ rows: [MenuRow], id: MenuCommandID) -> MenuCommand? {

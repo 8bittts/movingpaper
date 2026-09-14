@@ -1,6 +1,35 @@
 import AVFoundation
 import Photos
 
+/// Result of a Photos shuffle so the UI can explain access-denied vs empty vs export failure.
+enum PhotosShuffleOutcome: Equatable {
+    case video(URL)
+    case accessDenied
+    case noVideos
+    case exportFailed
+
+    var alertTitle: String? {
+        switch self {
+        case .video: nil
+        case .accessDenied: "Photos Access Needed"
+        case .noVideos: "No Videos Found"
+        case .exportFailed: "Couldn't Shuffle"
+        }
+    }
+
+    var alertMessage: String? {
+        switch self {
+        case .video: nil
+        case .accessDenied:
+            "Allow Photos access in System Settings to shuffle videos as wallpaper."
+        case .noVideos:
+            "Add a video to your Photos library, then try Shuffle from Photos again."
+        case .exportFailed:
+            "MovingPaper couldn't export a video from Photos. Try again, or choose a video with Choose from Photos."
+        }
+    }
+}
+
 /// Fetches random videos from the Photos library for shuffle mode.
 /// Stateless — every method is independently callable from any isolation.
 final class PhotosService: Sendable {
@@ -14,12 +43,12 @@ final class PhotosService: Sendable {
         return newStatus == .authorized || newStatus == .limited
     }
 
-    /// Fetch a random video URL from the entire Photos library.
+    /// Fetch a random video from the entire Photos library.
     /// Tries up to 3 random assets if export fails (iCloud-only, corrupted, etc.).
-    func randomVideoURL() async -> URL? {
+    func shuffle() async -> PhotosShuffleOutcome {
         guard await requestAccess() else {
             Log.photos.notice("Photos access denied; cannot shuffle")
-            return nil
+            return .accessDenied
         }
 
         let options = PHFetchOptions()
@@ -27,17 +56,17 @@ final class PhotosService: Sendable {
         let allVideos = PHAsset.fetchAssets(with: options)
         guard allVideos.count > 0 else {
             Log.photos.notice("No videos found in Photos library")
-            return nil
+            return .noVideos
         }
 
         for attempt in 0..<3 {
             let index = Int.random(in: 0..<allVideos.count)
             if let url = await exportVideo(asset: allVideos.object(at: index)) {
-                return url
+                return .video(url)
             }
             Log.photos.notice("Shuffle export attempt \(attempt + 1, privacy: .public)/3 failed")
         }
-        return nil
+        return .exportFailed
     }
 
     private func exportVideo(asset: PHAsset) async -> URL? {

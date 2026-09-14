@@ -11,7 +11,7 @@ struct MenuModelInput: Equatable {
     var hasAnyWallpaper: Bool
     var sharedFileName: String?
     var canCheckForUpdates: Bool
-    var appVersion: String
+    var openAtLogin: Bool
     var displays: [DisplayMenuInput]
 }
 
@@ -39,7 +39,8 @@ enum MenuCommandID: Equatable {
     case setModeAllDesktops
     case setModePerDesktop
     case checkForUpdates
-    case openYEN
+    case about
+    case toggleOpenAtLogin
     case quit
 }
 
@@ -170,7 +171,7 @@ enum MenuSnapshot {
     private static func playbackRows(from input: MenuModelInput) -> [MenuRow] {
         var rows: [MenuRow] = [
             .command(MenuCommand(
-                title: input.isMuted ? "Sound: Off" : "Sound: On",
+                title: input.isMuted ? "Turn Sound On" : "Turn Sound Off",
                 id: .toggleMute
             )),
             .submenu(title: "MovingPaper Mode", rows: [
@@ -197,16 +198,18 @@ enum MenuSnapshot {
     }
 
     private static func footerRows(from input: MenuModelInput) -> [MenuRow] {
-        let updateTitle = input.appVersion.isEmpty
-            ? "Check for Updates…"
-            : "Check for Updates (v\(input.appVersion))…"
-        return [
+        [
+            .command(MenuCommand(title: "About MovingPaper", id: .about)),
             .command(MenuCommand(
-                title: updateTitle,
+                title: "Check for Updates…",
                 id: .checkForUpdates,
                 enabled: input.canCheckForUpdates
             )),
-            .command(MenuCommand(title: "Built with YEN", id: .openYEN)),
+            .command(MenuCommand(
+                title: "Open at Login",
+                id: .toggleOpenAtLogin,
+                checked: input.openAtLogin
+            )),
             .separator,
             .command(MenuCommand(title: "Quit MovingPaper", id: .quit, keyEquivalent: "q")),
         ]

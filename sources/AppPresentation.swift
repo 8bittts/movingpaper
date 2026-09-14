@@ -17,15 +17,23 @@ enum AppPresentation {
         return try operation()
     }
 
-    static func showWarningAlert(title: String, message: String) {
+    static func showAlert(
+        title: String,
+        message: String,
+        style: NSAlert.Style = .informational
+    ) {
         withForegroundActivation {
             let alert = NSAlert()
             alert.messageText = title
             alert.informativeText = message
-            alert.alertStyle = .warning
+            alert.alertStyle = style
             alert.addButton(withTitle: "OK")
             alert.window.level = .floating
             alert.runModal()
         }
+    }
+
+    static func showWarningAlert(title: String, message: String) {
+        showAlert(title: title, message: message, style: .warning)
     }
 }

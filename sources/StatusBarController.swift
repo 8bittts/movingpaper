@@ -33,11 +33,10 @@ final class StatusBarController: NSObject {
 
     private func rebuildMenu(into menu: NSMenu) {
         menu.removeAllItems()
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
         let rows = MenuSnapshot.rows(
             from: wallpaperManager.menuInput(
-                appVersion: version,
-                canCheckForUpdates: updater.canCheckForUpdates
+                canCheckForUpdates: updater.canCheckForUpdates,
+                openAtLogin: OpenAtLogin.isEnabled
             )
         )
         append(rows, to: menu)
@@ -109,7 +108,8 @@ final class StatusBarController: NSObject {
         case .setModeAllDesktops: #selector(setModeAllDesktops)
         case .setModePerDesktop: #selector(setModePerDesktop)
         case .checkForUpdates: #selector(checkForUpdates)
-        case .openYEN: #selector(openYEN)
+        case .about: #selector(about)
+        case .toggleOpenAtLogin: #selector(toggleOpenAtLogin)
         case .quit: #selector(quit)
         }
     }
@@ -164,7 +164,8 @@ final class StatusBarController: NSObject {
             let alert = NSAlert()
             alert.messageText = "Paste YouTube URL"
             alert.informativeText = "Enter a YouTube video URL to use as your wallpaper."
-            alert.addButton(withTitle: "Start")
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "Download")
             alert.addButton(withTitle: "Cancel")
 
             let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 380, height: 24))
@@ -208,8 +209,33 @@ final class StatusBarController: NSObject {
         updater.checkForUpdates()
     }
 
-    @objc private func openYEN() {
-        NSWorkspace.shared.open(URL(string: "https://yen.chat")!)
+    @objc private func about() {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        AppPresentation.withForegroundActivation {
+            let alert = NSAlert()
+            alert.messageText = "MovingPaper"
+            let versionLine = version.isEmpty ? "" : "Version \(version)\n\n"
+            alert.informativeText = "\(versionLine)A moving wallpaper for your desktop.\n\nBuilt with YEN — yen.chat"
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: "Visit YEN")
+            alert.window.level = .floating
+            if alert.runModal() == .alertSecondButtonReturn {
+                NSWorkspace.shared.open(URL(string: "https://yen.chat")!)
+            }
+        }
+    }
+
+    @objc private func toggleOpenAtLogin() {
+        do {
+            try OpenAtLogin.setEnabled(!OpenAtLogin.isEnabled)
+        } catch {
+            AppPresentation.showAlert(
+                title: "Couldn't Update Login Item",
+                message: error.localizedDescription,
+                style: .warning
+            )
+        }
     }
 
     @objc private func quit() {

@@ -10,5 +10,10 @@ struct MovingPaperApp: App {
         Settings {
             EmptyView()
         }
+        .commands {
+            // Lifecycle-only Settings scene. Hide the system Settings command
+            // so Cmd-, and the app menu cannot open a blank window.
+            CommandGroup(replacing: .appSettings) {}
+        }
     }
 }

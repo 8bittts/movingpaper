@@ -38,7 +38,7 @@ It's the kind of app that makes you smile every time you minimize a window.
 [**Download MovingPaper v0.042**](https://github.com/8bittts/movingpaper/releases/download/v0.042/MovingPaper-0.042.dmg)
 <!-- /download-link -->
 
-Open the `.dmg`, drag **MovingPaper** to Applications, launch it. Look for the night sky icon in your menu bar -- that's it.
+Open the `.dmg`, drag **MovingPaper** to Applications, launch it. Look for the moon icon in your menu bar -- that's it.
 
 > Apple Silicon (arm64). Code-signed with Developer ID and notarized by Apple. Auto-updates via Sparkle.
 
@@ -91,12 +91,13 @@ Plays a looping video or GIF as your desktop background. Everything on your desk
 | **Paste YouTube URL…** | Download a supported YouTube URL as wallpaper |
 | **Choose from Photos…** | Pick a video from your Photos library |
 | **Shuffle from Photos** | Random video from your entire library |
-| **Sound: Off / On** | Toggle video audio |
+| **Turn Sound On / Off** | Toggle video audio |
 | **MovingPaper Mode** | All Desktops or Per Desktop |
 | **Pause / Resume** | Stop or restart playback |
 | **Remove MovingPaper** | Clear wallpaper |
+| **About MovingPaper** | Version and YEN credit |
 | **Check for Updates…** | Sparkle update check in a dockless updater dialog |
-| **Built with YEN** | Visit yen.chat |
+| **Open at Login** | Start MovingPaper when you log in |
 | **Quit MovingPaper** | Exit |
 
 In **Per Desktop** mode, each Space and monitor gets its own wallpaper -- switch Spaces and the wallpaper changes with it, even when macOS is keeping separate active Spaces on different displays.

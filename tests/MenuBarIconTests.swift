@@ -9,15 +9,21 @@ struct MenuBarIconTests {
         #expect(icon.size == MenuBarIcon.pointSize)
     }
 
-    @Test @MainActor func brandIconUsesBundledArtwork() {
+    @Test @MainActor func brandIconIsATemplateSymbol() {
         let icon = MenuBarIcon.brandIcon()
-        #expect(icon.isTemplate == false)
+        #expect(icon.isTemplate == true)
         #expect(icon.representations.isEmpty == false)
     }
 
     @Test @MainActor func iconScalesCorrectly() {
         let icon = MenuBarIcon.brandIcon()
-        #expect(icon.size.width == 22)
-        #expect(icon.size.height == 22)
+        #expect(icon.size.width == 18)
+        #expect(icon.size.height == 18)
+    }
+
+    @Test @MainActor func applicationIconKeepsColourArtwork() {
+        let icon = MenuBarIcon.applicationIcon()
+        #expect(icon != nil)
+        #expect(icon?.isTemplate == false)
     }
 }
