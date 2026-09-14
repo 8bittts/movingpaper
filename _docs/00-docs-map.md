@@ -11,8 +11,8 @@ There is no numbered `_docs/` series — **`README.md` is the primary doc surfac
 | Doc | Owns |
 |-----|------|
 | `README.md` | User features, build, release, smoke-test matrix, permissions |
-| `AGENTS.md` | Agent constraints (no Settings UI, WallpaperManager seams, `YTDLPInstaller` pin, Sparkle hooks) |
-| `_docs/todos.md` | **Only** active backlog (#29 runtime check) |
+| `AGENTS.md` | Agent constraints (no Settings UI, template extra icon, WallpaperManager seams, `YTDLPInstaller` pin, Sparkle hooks) |
+| `_docs/todos.md` | **Only** active backlog (#29 runtime check; deferred HIG #44–#48) |
 | `_docs/audit-closure-2026.md` | Shipped audit fixes + won't-fix registry (2026) |
 | Root `todos.md` | Stub redirect → `_docs/todos.md` |
 
