@@ -10,6 +10,8 @@
 
 ## Active Work
 
+- [ ] **#49 Swift 6.4 default build system** — `Package.swift` passes a relative `-F tools/sparkle` through `unsafeFlags`. The 6.4 default `swiftbuild` system sets `-working-directory` to the package's parent, so Sparkle no longer resolves and `swift build` / `swift test` both fail. `--build-system native` is the current workaround and passes 133 tests. Fix the search path (or move Sparkle to a binary target), then drop the workaround from `README.md`, `AGENTS.md`, `scripts/build-dmg.sh`, `scripts/build_and_run.sh`, `scripts/smoke-test.sh`, and `.github/workflows/ci.yml`.
+- [ ] **#50 Homebrew Cask lag** — `Casks/movingpaper.rb` is pinned to 0.040 while the current release is 0.043. No release script bumps it. Either add the bump to `scripts/release-movingpaper.sh` or bump the Cask by hand each release.
 - [ ] **#29 runtime sanity check** — With a fullscreen app covering the wallpaper, confirm `WallpaperWindowController` pauses `AVQueuePlayer` on occlusion and resumes when visible again. Low-risk; revertable if wrong.
 
 Deferred Apple HIG follow-ups (not this pass):
