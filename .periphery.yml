@@ -1,6 +1,8 @@
 # Periphery config for MovingPaper (SwiftPM package, single executable target).
 # Usage:
-#   brew install peripheryapp/periphery/periphery
+#   Install the final 3.8.0 binary from
+#   https://github.com/peripheryapp/periphery/releases/tag/3.8.0
+#   (upstream is archived; the Homebrew cask is stale at 2.21.2).
 #   periphery scan
 #
 # Notes:
