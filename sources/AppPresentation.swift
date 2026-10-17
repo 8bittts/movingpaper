@@ -32,8 +32,4 @@ enum AppPresentation {
             alert.runModal()
         }
     }
-
-    static func showWarningAlert(title: String, message: String) {
-        showAlert(title: title, message: message, style: .warning)
-    }
 }
