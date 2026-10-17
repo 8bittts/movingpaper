@@ -111,12 +111,10 @@ Requires macOS 15.0+ and Swift 6.0+.
 ```bash
 git clone https://github.com/8bittts/movingpaper.git
 cd movingpaper
-swift test --build-system native
+swift test
 ./scripts/smoke-test.sh
 ./scripts/build_and_run.sh
 ```
-
-On Swift 6.4 the `--build-system native` flag is required. The new default build system resolves the package's relative Sparkle framework search path against the wrong directory, so a plain `swift build` or `swift test` fails with `unable to resolve module dependency: 'Sparkle'`. The shell scripts above still call the bare commands and hit the same error.
 
 ```bash
 ./scripts/build_and_run.sh --logs       # launch and stream app logs

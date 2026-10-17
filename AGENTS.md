@@ -3,10 +3,9 @@
 ## Orientation
 
 SwiftPM macOS menu-bar app (`sources/`, `tests/`).
-Validate with `swift test --build-system native` and `./scripts/smoke-test.sh`; `--production` also verifies signing, notarization, checksum, and the signed appcast without launching the wallpaper app.
-`--build-system native` is required on Swift 6.4: the new default `swiftbuild` system passes `-working-directory` as the package's parent, so the relative `-F tools/sparkle` in `Package.swift` no longer resolves and every target fails with `unable to resolve module dependency: 'Sparkle'`.
-That error means the build system, not a broken checkout — measured, 133 tests pass under `native` on the same tree.
-`scripts/*.sh` and `.github/workflows/ci.yml` still call bare `swift build` / `swift test` and inherit the failure; see `_docs/todos.md` for the real fix.
+Validate with `swift test` and `./scripts/smoke-test.sh`; `--production` also verifies signing, notarization, checksum, and the signed appcast without launching the wallpaper app.
+`Package.swift` anchors the Sparkle search and rpath flags to the manifest, so they resolve under both Swift 6.4's default `swiftbuild` system (`.build/out`) and `--build-system native`.
+Periphery 3.8.0 is the exception: it finds no index store under `swiftbuild`, so `.periphery.yml` passes `--build-system native`.
 See README "Build from Source" for the full script matrix; CI (`.github/workflows/ci.yml`) runs only `swift build` + `swift test`.
 Owner-doc index: [_docs/00-docs-map.md](_docs/00-docs-map.md).
 
