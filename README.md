@@ -128,6 +128,7 @@ swift test
 Use `build_and_run.sh` for anything that touches Sparkle — it launches a fully staged `.app` bundle. `swift run MovingPaper` is fine for general codepaths, but Sparkle stays dormant there.
 
 Use `smoke-test.sh` before shipping changes. The default mode does not launch the wallpaper app; it runs the test suite, builds release, assembles a staged app bundle, and verifies core bundle shape. `--production` also requires and verifies the signed release app, signed and notarized DMG, checksum, and signed Sparkle appcast metadata.
+In the default mode, an existing `build/MovingPaper.app` also triggers that release check, so a stale bundle without its DMG fails until `./scripts/build-dmg.sh` rebuilds it.
 
 Don't have any videos or GIFs on-hand? The `videos/` folder ships with ten sample wallpapers you can load into MovingPaper to try it out. More will be added over time.
 
