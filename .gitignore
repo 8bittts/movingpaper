@@ -16,3 +16,4 @@ DerivedData/
 tools/yt-dlp/yt-dlp
 /build/*.notary-submission.json
 /build/appcast.xml
+/.worktrees/
