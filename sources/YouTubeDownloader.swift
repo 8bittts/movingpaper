@@ -267,7 +267,7 @@ final class YouTubeDownloader: ObservableObject {
                 }
             }
 
-            proc.terminationHandler = { proc in
+            proc.terminationHandler = { [self] proc in
                 pipe.fileHandleForReading.readabilityHandler = nil
                 errPipe.fileHandleForReading.readabilityHandler = nil
                 let errData = errAccumulator.value + errPipe.fileHandleForReading.readDataToEndOfFile()

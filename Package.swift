@@ -74,8 +74,6 @@ let package = Package(
                     sparkleSearchPath,
                     "-framework",
                     "Sparkle",
-                    "-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks",
-                    "-Xlinker", "-rpath", "-Xlinker", "@loader_path/../Frameworks",
                     // The test bundle is never shipped, so it may carry an absolute rpath. It has to:
                     // the relative hop below counted directories in the old `.build/debug` layout, and
                     // the Xcode build engine nests the bundle deeper under `.build/out/Products/Debug`,
