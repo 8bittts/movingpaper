@@ -3,12 +3,12 @@
 # Used by scripts/build-dmg.sh preflight to detect tampering or accidental
 # truncation of the vendored framework. Update whenever Sparkle is re-vendored.
 
-sparkle_version=2.10.0
-sparkle_build=2064
-sparkle_source=https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-2.10.0.tar.xz
+sparkle_version=2.10.1
+sparkle_build=2065
+sparkle_source=https://github.com/sparkle-project/Sparkle/releases/download/2.10.1/Sparkle-2.10.1.tar.xz
 
 # SHA-256 of the main framework Mach-O. Stable per Sparkle release.
-sparkle_binary_sha256=a4b35bf38c12044686d0910dcb680560f1ff000061fbe19541c0b5e41c6c6008
+sparkle_binary_sha256=9c78b2046e7637efeb8ca505d63170bc1557651925dbbfd45ac236845732b05a
 
 # Required helpers that must be present after vendoring. Missing any of these
 # breaks in-app updates at runtime (the dockishOS 0.014/0.015 regression that
