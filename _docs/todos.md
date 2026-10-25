@@ -28,5 +28,3 @@ Deferred Apple HIG follow-ups (not this pass):
 - **#46 first-run discoverability** — Silent launch. HIG also says do not alert on startup. Needs a non-alert one-time hint, not a launch sheet.
 - **#47 system-material HUD** — Night-sky overlay is brand. Do not restyle it as Liquid Glass in this pass.
 - **#48 String Catalog** — All copy is English. Localize in a dedicated pass.
-
-Fleet documentation normalization: this repo's slice is recorded in [8leeai `_docs/todos.md`](../../8leeai/_docs/todos.md#fleet-documentation-normalization).

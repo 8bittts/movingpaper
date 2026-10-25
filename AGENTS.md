@@ -7,7 +7,7 @@ Validate with `swift test` and `./scripts/smoke-test.sh`; `--production` also ve
 `Package.swift` anchors the Sparkle search and rpath flags to the manifest, so they resolve under both Swift 6.4's default `swiftbuild` system (`.build/out`) and `--build-system native`.
 Periphery 3.8.0 is the exception: it finds no index store under `swiftbuild`, so `.periphery.yml` passes `--build-system native`.
 The script matrix, release flow and CI are in [_docs/05-infrastructure.md](_docs/05-infrastructure.md); the gates are in [_docs/09-quality.md](_docs/09-quality.md).
-Owner-doc index: [_docs/00-docs-map.md](_docs/00-docs-map.md).
+Owner-doc index: [_docs/00-docs-map.md](_docs/00-docs-map.md), which follows the fleet documentation standard.
 
 Sparkle work must go through `./scripts/build_and_run.sh`, which stages a real `.app` under `build/local-run/`.
 `swift run MovingPaper` leaves Sparkle dormant.
