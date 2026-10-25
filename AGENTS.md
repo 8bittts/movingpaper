@@ -6,7 +6,7 @@ SwiftPM macOS menu-bar app (`sources/`, `tests/`).
 Validate with `swift test` and `./scripts/smoke-test.sh`; `--production` also verifies signing, notarization, checksum, and the signed appcast without launching the wallpaper app.
 `Package.swift` anchors the Sparkle search and rpath flags to the manifest, so they resolve under both Swift 6.4's default `swiftbuild` system (`.build/out`) and `--build-system native`.
 Periphery 3.8.0 is the exception: it finds no index store under `swiftbuild`, so `.periphery.yml` passes `--build-system native`.
-See README "Build from Source" for the full script matrix; CI (`.github/workflows/ci.yml`) runs only `swift build` + `swift test`.
+The script matrix, release flow and CI are in [_docs/05-infrastructure.md](_docs/05-infrastructure.md); the gates are in [_docs/09-quality.md](_docs/09-quality.md).
 Owner-doc index: [_docs/00-docs-map.md](_docs/00-docs-map.md).
 
 Sparkle work must go through `./scripts/build_and_run.sh`, which stages a real `.app` under `build/local-run/`.
@@ -36,7 +36,7 @@ Status-menu structure lives in `MenuSnapshot`; tests cover labels without launch
   Check for a new release with `gh api repos/sparkle-project/Sparkle/releases/latest`, which excludes prereleases by definition.
   Never use `gh api repos/sparkle-project/Sparkle/releases --jq '.[0]'` — it returns the newest release of any kind and would vendor a beta into a signed app.
   An empty `latest` response means the check failed, not that the pin is current.
-  dockishOS `BUILD.md` owns the full re-vendor procedure; follow it rather than duplicating it here.
+  dockishOS `_docs/05-infrastructure.md` owns the full re-vendor procedure; follow it rather than duplicating it here.
 - Every Sparkle UI entry point must foreground this accessory app; keep the `AppPresentation.promoteToForeground()` + `startFloatingWindows()` pairing on all three entry points in `MovingPaperUpdater` — including `standardUserDriverWillShowModalAlert()` — and the `returnToAccessory()` restore on session finish.
 - `_docs/todos.md` is the only active backlog; root `todos.md` is a tracked redirect stub — do not repopulate or delete it.
-  Completed analysis belongs in `_docs/audit-closure-2026.md` or git history.
+  Completed analysis belongs in `_docs/00-foundation.md` or git history.

@@ -116,19 +116,7 @@ swift test
 ./scripts/build_and_run.sh
 ```
 
-```bash
-./scripts/build_and_run.sh --logs       # launch and stream app logs
-./scripts/smoke-test.sh --production    # verify tests, release build, signing, notarized DMG, checksum, appcast
-./scripts/build-dmg.sh --build-only     # assemble release app bundle only
-./scripts/build-dmg.sh --local          # build + sign + DMG, skip notarization
-./scripts/build-dmg.sh --unsigned       # ad-hoc sign, no Developer ID
-./scripts/release-movingpaper.sh        # bump + package + notarize + tag + GitHub release
-```
-
-Use `build_and_run.sh` for anything that touches Sparkle — it launches a fully staged `.app` bundle. `swift run MovingPaper` is fine for general codepaths, but Sparkle stays dormant there.
-
-Use `smoke-test.sh` before shipping changes. The default mode does not launch the wallpaper app; it runs the test suite, builds release, assembles a staged app bundle, and verifies core bundle shape. `--production` also requires and verifies the signed release app, signed and notarized DMG, checksum, and signed Sparkle appcast metadata.
-In the default mode, an existing `build/MovingPaper.app` also triggers that release check, so a stale bundle without its DMG fails until `./scripts/build-dmg.sh` rebuilds it.
+The full script matrix, the release flow and the smoke-test contract are in [`_docs/05-infrastructure.md`](_docs/05-infrastructure.md) and [`_docs/09-quality.md`](_docs/09-quality.md).
 
 Don't have any videos or GIFs on-hand? The `videos/` folder ships with ten sample wallpapers you can load into MovingPaper to try it out. More will be added over time.
 
@@ -136,29 +124,8 @@ Don't have any videos or GIFs on-hand? The `videos/` folder ships with ten sampl
 
 ## How It Works
 
-A borderless `NSPanel` at `desktopWindow + 1` sits above the system wallpaper but below Finder icons.
-`ignoresMouseEvents = true` keeps the desktop interactive.
-Video loops via `AVQueuePlayer` + `AVPlayerLooper`.
-GIFs animate via `CGAnimateImageAtURLWithBlock` and keep looping.
-Clip and Space changes reuse the on-screen panel so the system desktop does not flash through.
-Per-display Space changes are tracked from macOS's managed display-space snapshot, with a `CGSGetActiveSpace` fallback.
-
-## Tech Stack
-
-| | |
-|---|---|
-| Build | Swift Package Manager |
-| Windowing | AppKit (`NSPanel`, `NSStatusItem`) |
-| UI | AppKit wallpaper views; SwiftUI only for the app lifecycle and loading overlay |
-| Video | AVFoundation (`AVQueuePlayer`, `AVPlayerLooper`, `AVPlayerLayer`) |
-| Photos | PhotosUI (`PHPickerViewController`) + PhotoKit (shuffle) |
-| GIF | ImageIO (`CGAnimateImageAtURLWithBlock`) |
-| Desktop tracking | CoreGraphics private APIs (`CGSCopyManagedDisplaySpaces`, `CGSGetActiveSpace`) |
-| Updates | [Sparkle](https://sparkle-project.org) 2.10.0 (EdDSA-signed feed, signed archives, signed-feed enforcement, verify-before-extraction, vendored) |
-| Signing | Developer ID + Apple notarization |
-| Static analysis | [Periphery](https://github.com/peripheryapp/periphery) (unused code detection, see `.periphery.yml`) |
-| CI | GitHub Actions (`swift build` + `swift test --parallel` on every push/PR, see `.github/workflows/ci.yml`) |
-| Distribution | Direct DMG download and Homebrew Cask (`Casks/movingpaper.rb`) |
+A borderless `NSPanel` sits above the system wallpaper and below Finder icons, so the desktop stays interactive while video or GIF loops underneath.
+The module map, the coordinator seams and the tech stack are in [`_docs/01-architecture.md`](_docs/01-architecture.md).
 
 ## Contributing
 

@@ -1,10 +1,18 @@
 # MovingPaper TODOs
 
 ---
+
 ## MUST FOLLOW RULES and PROTOCOLS:
+
 1. Never remove, delete, or modify this list unless directed to do so.
 2. Active work only. Completed work lives in git history.
-3. This is the ONLY TODO/backlog file.
+3. `_docs/todos.md` is the only backlog file.
+4. Keep clear separation of concerns with phase-based checklists and zero task duplication.
+5. Validate, review, and test each phase before moving to the next phase.
+6. Stage and commit only files touched for the active phase. Ignore unrelated edits from other agents.
+7. Write durable findings into the `_docs/` file that owns the topic, replacing any sentence they contradict; history and research go only in `00-foundation.md`.
+8. End every phase with a docs-alignment step that updates internal and public documentation and runs the project's declared gates.
+9. Root `todos.md` is a tracked redirect stub; never repopulate or delete it.
 
 ---
 
@@ -21,5 +29,4 @@ Deferred Apple HIG follow-ups (not this pass):
 - **#47 system-material HUD** — Night-sky overlay is brand. Do not restyle it as Liquid Glass in this pass.
 - **#48 String Catalog** — All copy is English. Localize in a dedicated pass.
 
-Historical audit closure (34 shipped fixes, won't-fix registry): [`audit-closure-2026.md`](./audit-closure-2026.md).
-HIG menu-bar extra pass (#30–#43) is in git history.
+Fleet documentation normalization: this repo's slice is recorded in [8leeai `_docs/todos.md`](../../8leeai/_docs/todos.md#fleet-documentation-normalization).

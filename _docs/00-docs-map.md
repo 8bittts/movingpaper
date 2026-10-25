@@ -1,29 +1,46 @@
-# movingpaper Documentation Map
+# MovingPaper Documentation Map
 
-Quick index of documentation surfaces. Product: macOS menu-bar live wallpaper app. Agent routing: `AGENTS.md`.
+macOS menu-bar app that plays a looping video, GIF, YouTube clip or Photos video as the desktop wallpaper.
+Agent routing lives in `AGENTS.md`; this index follows the fleet documentation standard that `/docs` audits against.
 
-There is no numbered `_docs/` series — **`README.md` is the primary doc surface.**
+## Owner docs
 
----
+| Doc                    | Owns                                                                                                  |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- |
+| `00-foundation.md`     | History, decisions and the audit closure record                                                       |
+| `01-architecture.md`   | Stack, wallpaper panel, coordinator seams, sources, status item, modes, build pipeline                 |
+| `02-design-system.md`  | Marks, the template status-item symbol, overlay style, menu copy                                       |
+| `04-security.md`       | Sandbox and permissions, signing and notarization, update-feed trust, yt-dlp supply chain, local data |
+| `05-infrastructure.md` | Scripts, release, distribution, Sparkle vendoring, CI, toolchain                                       |
+| `09-quality.md`        | Gates, test strategy, static analysis, manual verification                                            |
+| `todos.md`             | The only backlog; active work only                                                                    |
 
-## Documentation surfaces
+## Not applicable
 
-| Doc | Owns |
-|-----|------|
-| `README.md` | User features, build, release, smoke-test matrix, permissions |
-| `AGENTS.md` | Agent constraints (no Settings UI, template extra icon, WallpaperManager seams, `YTDLPInstaller` pin, Sparkle hooks and vendor pin) |
-| `_docs/todos.md` | **Only** active backlog (#29 runtime check; build + release #49–#50; deferred HIG #44–#48) |
-| `_docs/audit-closure-2026.md` | Shipped audit fixes + won't-fix registry (2026) |
-| Root `todos.md` | Stub redirect → `_docs/todos.md` |
+- `03-data.md`: the only persisted data is the wallpaper store, owned by `01-architecture.md`.
+- `06-payments.md`, `07-email.md`, `08-growth.md`, `10-gtm.md`: the app is free, sends nothing, and has no analytics or marketing surface.
+
+## Other surfaces
+
+| Path                         | Notes                                                                                                 |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `AGENTS.md`                  | Orientation and the constraints that bind every change                                                |
+| `README.md`                  | User-facing features, download, Homebrew, menu, quick build; points here                              |
+| `todos.md` (root)            | Tracked redirect stub to `_docs/todos.md`; never repopulate or delete it                              |
+| `Casks/movingpaper.rb`       | Homebrew Cask, bumped by hand after a release                                                         |
+| `tools/sparkle/VERSION`      | Sparkle vendoring pin read by the build preflight                                                     |
+| `.periphery.yml`             | Periphery configuration                                                                               |
+| `.github/workflows/ci.yml`   | CI: build and test only                                                                               |
+| `videos/`                    | Sample wallpapers                                                                                     |
 
 ## Sibling macOS apps
 
-| Project | Release doc home |
-|---------|------------------|
-| dockishOS | `BUILD.md` + [`../../dockishOS/_docs/00-docs-map.md`](../../dockishOS/_docs/00-docs-map.md) |
-| movingpaper | `README.md` (embedded build/release) |
+dockishOS shares the Sparkle pipeline and owns the re-vendor procedure in [`../../dockishOS/_docs/05-infrastructure.md`](../../dockishOS/_docs/05-infrastructure.md); its index is [`../../dockishOS/_docs/00-docs-map.md`](../../dockishOS/_docs/00-docs-map.md).
 
-## Settled doc decisions
+## Authority order
 
-- No separate `BUILD.md` (unlike dockishOS) — acceptable at this scale.
-  `README.md` owns build and release; `AGENTS.md` owns the Sparkle vendor-pin rules and cites dockishOS `BUILD.md` for the full re-vendor procedure.
+Code, scripts and tests, then the owner doc, then `AGENTS.md`, then `README.md`.
+
+## Known doc drift
+
+None.
