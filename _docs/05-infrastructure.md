@@ -35,7 +35,7 @@ Notarization uses the keychain profile `YEN-Notarization` unless `MOVINGPAPER_NO
 
 ## Sparkle vendoring
 
-The vendored framework lives at `tools/sparkle/Sparkle.framework` and is pinned in `tools/sparkle/VERSION` to version 2.10.0, build 2064, with the main binary's SHA-256 and the required helper paths.
+The vendored framework lives at `tools/sparkle/Sparkle.framework` and is pinned in `tools/sparkle/VERSION` to version 2.10.1, build 2065, with the main binary's SHA-256 and the required helper paths.
 The `scripts/build-dmg.sh` preflight fails the build when the framework drifts from the pin, and re-vendoring updates every field of that file in the same change.
 Check for a new release with `gh api repos/sparkle-project/Sparkle/releases/latest`, never the newest entry of `releases`, which can be a beta; an empty `latest` response means the check failed.
 The full re-vendor procedure is owned by dockishOS in [`../../dockishOS/_docs/05-infrastructure.md`](../../dockishOS/_docs/05-infrastructure.md); follow it rather than a local copy.
