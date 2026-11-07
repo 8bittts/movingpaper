@@ -170,6 +170,8 @@ final class StatusBarController: NSObject {
 
             let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 380, height: 24))
             input.placeholderString = "https://youtube.com/watch?v=..."
+            // A pasted clipboard value hides the placeholder, so the field needs its own name.
+            input.setAccessibilityLabel("YouTube URL")
             input.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
             input.lineBreakMode = .byTruncatingMiddle
             input.usesSingleLineMode = true
