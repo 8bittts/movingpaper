@@ -162,6 +162,14 @@ final class YouTubeDownloader {
         case cancelled
     }
 
+    /// What one subprocess run left behind, gathered off the main actor.
+    private struct ProcessExit {
+        var status: Int32 = 0
+        var errorOutput = Data()
+        /// Set when the process never launched.
+        var launchError: String?
+    }
+
     /// The inherited environment with the common ffmpeg locations on `PATH`.
     private static var processEnvironment: [String: String] {
         var environment = ProcessInfo.processInfo.environment
@@ -216,13 +224,66 @@ final class YouTubeDownloader {
             process.standardOutput = outputPipe
             process.standardError = errorPipe
 
-            // Drain stderr continuously; otherwise a chatty yt-dlp run can fill the
-            // pipe buffer and block the child while we wait for it to exit.
-            let errorOutput = OSAllocatedUnfairLock(initialState: Data())
+            // A run is over when the process has exited AND stderr has reached its
+            // end. Waiting for both, without blocking a thread on either, means the
+            // closing "ERROR:" line cannot be lost to a read still in flight when
+            // the process exits.
+            let finished = DispatchGroup()
+            let exit = OSAllocatedUnfairLock(initialState: ProcessExit())
+            finished.enter() // the process exits
+            finished.enter() // stderr ends
+
+            process.terminationHandler = { process in
+                outputPipe.fileHandleForReading.readabilityHandler = nil
+                exit.withLock { $0.status = process.terminationStatus }
+                finished.leave()
+            }
+
+            finished.notify(queue: .main) { [weak self] in
+                // Holding the pipe here keeps its read handler alive until the end.
+                _ = errorPipe
+                let exit = exit.withLock { $0 }
+                MainActor.assumeIsolated {
+                    guard let self else {
+                        continuation.resume(returning: .cancelled)
+                        return
+                    }
+                    self.process = nil
+                    if let launchError = exit.launchError {
+                        continuation.resume(returning: .failed("Failed to run yt-dlp: \(launchError)"))
+                    } else if self.activeDownloadID != downloadID {
+                        continuation.resume(returning: .cancelled)
+                    } else if exit.status == 0 {
+                        continuation.resume(returning: .succeeded)
+                    } else {
+                        continuation.resume(returning: .failed(Self.failureMessage(fromStandardError: exit.errorOutput)))
+                    }
+                }
+            }
+
+            do {
+                try process.run()
+                self.process = process
+            } catch {
+                // Nothing launched, so neither event will arrive. No read handler is
+                // installed yet, so both are settled here, exactly once.
+                process.terminationHandler = nil
+                exit.withLock { $0.launchError = error.localizedDescription }
+                finished.leave()
+                finished.leave()
+                return
+            }
+
+            // Installed after launch: output written before this point waits in the
+            // pipe. Draining stderr as it arrives also keeps a chatty run from
+            // filling the pipe and blocking the child. An empty read is its end.
             errorPipe.fileHandleForReading.readabilityHandler = { handle in
                 let chunk = handle.availableData
-                if !chunk.isEmpty {
-                    errorOutput.withLock { $0.append(chunk) }
+                if chunk.isEmpty {
+                    handle.readabilityHandler = nil
+                    finished.leave()
+                } else {
+                    exit.withLock { $0.errorOutput.append(chunk) }
                 }
             }
 
@@ -235,39 +296,6 @@ final class YouTubeDownloader {
                     guard let self, self.activeDownloadID == downloadID else { return }
                     self.progress = fraction
                 }
-            }
-
-            process.terminationHandler = { [weak self] process in
-                outputPipe.fileHandleForReading.readabilityHandler = nil
-                errorPipe.fileHandleForReading.readabilityHandler = nil
-                let errorData = errorOutput.withLock { $0 } + errorPipe.fileHandleForReading.readDataToEndOfFile()
-                try? outputPipe.fileHandleForReading.close()
-                try? errorPipe.fileHandleForReading.close()
-                let status = process.terminationStatus
-
-                Task { @MainActor [weak self] in
-                    guard let self else {
-                        continuation.resume(returning: .cancelled)
-                        return
-                    }
-                    self.process = nil
-                    if self.activeDownloadID != downloadID {
-                        continuation.resume(returning: .cancelled)
-                    } else if status == 0 {
-                        continuation.resume(returning: .succeeded)
-                    } else {
-                        continuation.resume(returning: .failed(Self.failureMessage(fromStandardError: errorData)))
-                    }
-                }
-            }
-
-            do {
-                try process.run()
-                self.process = process
-            } catch {
-                outputPipe.fileHandleForReading.readabilityHandler = nil
-                errorPipe.fileHandleForReading.readabilityHandler = nil
-                continuation.resume(returning: .failed("Failed to run yt-dlp: \(error.localizedDescription)"))
             }
         }
     }
