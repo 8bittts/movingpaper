@@ -5,6 +5,7 @@ Code signing, update-feed trust, the yt-dlp supply chain, permissions and the sa
 ## Sandbox and permissions
 
 `MovingPaper.entitlements` sets `com.apple.security.app-sandbox` to false: the app reads private CoreGraphics Spaces state and runs yt-dlp as a subprocess, neither of which a sandboxed app can do.
+It also declares `com.apple.security.personal-information.photos-library`, the Hardened Runtime resource-access key Apple documents for PhotoKit, and `./scripts/smoke-test.sh --production` fails a release app signed without it.
 Photos access is requested only when the user picks or shuffles from the library; the picker route uses `PHPickerViewController` and Shuffle uses PhotoKit authorization.
 Wallpaper actions, Photos prompts and downloads are real side effects on the operator's desktop, so verification prefers source inspection and non-launching checks ([09-quality.md](09-quality.md)).
 
@@ -23,7 +24,8 @@ Every Sparkle UI entry point foregrounds the accessory app and returns it to acc
 
 `YTDLPInstaller` pins yt-dlp by release version and SHA-256, bumped together.
 The downloaded binary is hashed before it is installed and made executable, an installed copy is re-verified against the pin before every use, and a corrupt or pin-stale copy is re-downloaded rather than executed.
-A dev-tree binary is trusted as-is for development only.
+A dev-tree binary at `tools/yt-dlp/yt-dlp`, relative to the working directory, is trusted as-is in debug builds only (`#if DEBUG`); a release build never looks for it.
+The YouTube prompt prefills the clipboard only when it holds a YouTube URL, so unrelated clipboard text is never shown.
 Downloads run serialized through `AsyncSerialGate`, and cancellation tears down the subprocess through `withTaskCancellationHandler`.
 
 ## Local data

@@ -13,6 +13,8 @@ CI runs only `swift build` and `swift test --parallel` ([05-infrastructure.md](0
 Wallpaper runtime actions are real side effects: they mutate the desktop wallpaper, request Photos access and start downloads.
 Prefer source inspection and non-launching checks over clicking menu actions.
 The status-menu structure lives in `MenuSnapshot`, so tests cover menu labels without launching the app.
+`VideoWallpaperView` and `GIFWallpaperView` are tested without a window against the sample media in `videos/`, so no wallpaper appears on the desktop.
+`YouTubeDownloader` takes its cache directory and binary resolver by injection; its tests run a shell script in place of yt-dlp, which covers progress, failure, launch failure, cancel, task cancellation and the queue with no network.
 A `WallpaperPersistenceStore` schema change is not done until a test covers the new migration path.
 Mutation-test a new guard by breaking what it protects and watching it fail.
 
@@ -20,6 +22,7 @@ Mutation-test a new guard by breaking what it protects and watching it fail.
 
 Periphery 3.8.0 (`.periphery.yml`) finds unused code; install the final 3.8.0 binary from its GitHub release because upstream is archived and the Homebrew cask is stale.
 It passes `--build-system native` because Swift 6.4's default build system writes no index store where Periphery looks, and it retains public, `@objc`, protocol-parameter and assign-only declarations on purpose.
+CI compiles with an older toolchain and SDK than a current Mac (Swift 6.1 on the `macos-15` runner), so a construct that only a newer compiler or SDK accepts passes locally and fails there.
 
 ## Manual verification
 

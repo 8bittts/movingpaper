@@ -19,7 +19,8 @@
 ## Active Work
 
 - [ ] **#50 Homebrew Cask lag** — `Casks/movingpaper.rb` is pinned to 0.040 while the current release is 0.044. No release script bumps it. Either add the bump to `scripts/release-movingpaper.sh` or bump the Cask by hand each release.
-- [ ] **#29 runtime sanity check** — With a fullscreen app covering the wallpaper, confirm `WallpaperWindowController` pauses `AVQueuePlayer` on occlusion and resumes when visible again. Low-risk; revertable if wrong.
+- [ ] **#29 runtime sanity check** — With a fullscreen app covering the wallpaper, confirm `WallpaperWindowController` pauses the video or GIF on occlusion and resumes when visible again. Also confirm a wallpaper set in Low Power Mode holds its first frame and starts when Low Power Mode ends. Low-risk; revertable if wrong.
+- [ ] **#51 Photos entitlement runtime check** — On the next notarized build, confirm Shuffle from Photos prompts for access and exports a video. The release app now carries `com.apple.security.personal-information.photos-library`; earlier builds ran under Hardened Runtime without it.
 
 Deferred Apple HIG follow-ups (not this pass):
 
