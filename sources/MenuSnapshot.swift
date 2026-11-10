@@ -51,6 +51,8 @@ struct MenuCommand: Equatable {
     var checked: Bool = false
     var displayID: CGDirectDisplayID? = nil
     var keyEquivalent: String = ""
+    /// SF Symbol shown beside the title. Every command in a group has one or none does.
+    var symbolName: String? = nil
 }
 
 enum MenuRow: Equatable {
@@ -76,9 +78,8 @@ enum MenuSnapshot {
 
     private static func downloadRows(progress: Double?) -> [MenuRow] {
         guard let progress else { return [] }
-        let pct = Int(progress * 100)
         return [
-            .disabled("Downloading: \(pct)%…"),
+            .disabled(MenuBarLabelFormatter.downloadStatus(progress: progress)),
             .command(MenuCommand(title: "Cancel Download", id: .cancelDownload)),
             .separator,
         ]
@@ -141,7 +142,7 @@ enum MenuSnapshot {
         )
         let rows: [MenuRow] = space.isCurrent
             ? sourceCommands(displayID: displayID, includeRemove: space.fileName != nil)
-            : [.disabled("Switch to this desktop to change")]
+            : [.disabled("Switch to This Desktop to Change")]
         return .submenu(title: label, checked: space.isCurrent, rows: rows)
     }
 
@@ -150,13 +151,23 @@ enum MenuSnapshot {
         includeRemove: Bool
     ) -> [MenuRow] {
         var rows: [MenuRow] = [
-            .command(MenuCommand(title: "Choose File…", id: .chooseFile, displayID: displayID)),
-            .command(MenuCommand(title: "Paste YouTube URL…", id: .pasteYouTube, displayID: displayID)),
-            .command(MenuCommand(title: "Choose from Photos…", id: .choosePhotos, displayID: displayID)),
-            .command(MenuCommand(title: "Shuffle from Photos", id: .shufflePhotos, displayID: displayID)),
+            .command(MenuCommand(
+                title: "Choose File…", id: .chooseFile, displayID: displayID, symbolName: "folder"
+            )),
+            .command(MenuCommand(
+                title: "Paste YouTube URL…", id: .pasteYouTube, displayID: displayID, symbolName: "link"
+            )),
+            .command(MenuCommand(
+                title: "Choose from Photos…", id: .choosePhotos, displayID: displayID, symbolName: "photo.on.rectangle"
+            )),
+            .command(MenuCommand(
+                title: "Shuffle from Photos", id: .shufflePhotos, displayID: displayID, symbolName: "shuffle"
+            )),
         ]
         if includeRemove {
-            rows.append(.command(MenuCommand(title: "Remove", id: .clearDisplay, displayID: displayID)))
+            rows.append(.command(MenuCommand(
+                title: "Remove", id: .clearDisplay, displayID: displayID, symbolName: "trash"
+            )))
         }
         return rows
     }

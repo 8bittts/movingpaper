@@ -1,4 +1,5 @@
 import CoreGraphics
+import AppKit
 import Testing
 @testable import MovingPaper
 
@@ -9,7 +10,7 @@ struct MenuSnapshotTests {
 
     @Test func downloadProgressInsertsCancelBeforeTheSourceSection() {
         let rows = MenuSnapshot.rows(from: baseInput(downloadProgress: 0.42))
-        #expect(rows[0] == .disabled("Downloading: 42%…"))
+        #expect(rows[0] == .disabled("Downloading 42%"))
         #expect(command(rows[1])?.id == .cancelDownload)
         #expect(rows[2] == .separator)
         #expect(command(rows[3])?.id == .chooseFile)
@@ -92,7 +93,7 @@ struct MenuSnapshotTests {
             return
         }
         #expect(!otherChecked)
-        #expect(otherChildren == [.disabled("Switch to this desktop to change")])
+        #expect(otherChildren == [.disabled("Switch to This Desktop to Change")])
         #expect(containsCommand(rows, id: .clearAll, title: "Remove All MovingPapers"))
     }
 
@@ -147,6 +148,91 @@ struct MenuSnapshotTests {
         let quit = firstCommand(MenuSnapshot.rows(from: baseInput()), id: .quit)
         #expect(quit?.title == "Quit MovingPaper")
         #expect(quit?.keyEquivalent == "q")
+    }
+
+    // MARK: - Design conventions (Human Interface Guidelines: Menus)
+
+    /// A fully populated menu in both modes, so every label and symbol is covered.
+    private func everyRow() -> [MenuRow] {
+        var input = baseInput(downloadProgress: 0.42)
+        input.hasAnyWallpaper = true
+        input.sharedFileName = "clip.mp4"
+        let allDesktops = MenuSnapshot.rows(from: input)
+        input.mode = .perDesktop
+        input.displays = [
+            DisplayMenuInput(id: 1, name: "Built-in", spaces: [
+                SpaceMenuInput(fileName: "a.mp4", isCurrent: true),
+                SpaceMenuInput(fileName: nil, isCurrent: false),
+            ]),
+            DisplayMenuInput(id: 2, name: "Studio Display", spaces: [
+                SpaceMenuInput(fileName: nil, isCurrent: true),
+            ]),
+        ]
+        return allDesktops + MenuSnapshot.rows(from: input)
+    }
+
+    private func everyCommand(_ rows: [MenuRow]) -> [MenuCommand] {
+        rows.flatMap { row -> [MenuCommand] in
+            switch row {
+            case .command(let command): [command]
+            case .submenu(_, _, let children): everyCommand(children)
+            default: []
+            }
+        }
+    }
+
+    /// "Provide icons for all menu items in a group, or none of them."
+    @Test func symbolsAreUniformWithinEachGroup() {
+        func check(_ rows: [MenuRow]) {
+            for group in rows.split(separator: .separator) {
+                let commands = group.compactMap { command($0) }
+                let withSymbol = commands.filter { $0.symbolName != nil }
+                #expect(
+                    withSymbol.isEmpty || withSymbol.count == commands.count,
+                    "mixed symbols in group: \(commands.map(\.title))"
+                )
+                for row in group {
+                    if case .submenu(_, _, let children) = row { check(children) }
+                }
+            }
+        }
+        check(everyRow())
+    }
+
+    @Test @MainActor func everySymbolNameIsARealSFSymbol() {
+        let names = Set(everyCommand(everyRow()).compactMap(\.symbolName))
+        #expect(names == ["folder", "link", "photo.on.rectangle", "shuffle", "trash"])
+        for name in names {
+            #expect(
+                NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil,
+                "unknown SF Symbol: \(name)"
+            )
+        }
+    }
+
+    /// Labels use title-style capitalization, never end in a period, and use the
+    /// ellipsis character (not three periods) only as a trailing "needs more input" mark.
+    @Test func labelsFollowTheMenuTextPattern() {
+        let lowercaseWords: Set<String> = ["a", "an", "the", "and", "or", "at", "by", "for", "from", "in", "of", "on", "to"]
+        // File names and display names are user content, not copy.
+        let titles = commandTitles(everyRow()).filter { !$0.contains(".mp4") && $0 != "Built-in" && $0 != "Studio Display" }
+        #expect(titles.count > 20)
+        for title in titles {
+            #expect(!title.hasSuffix("."), "ends with a period: \(title)")
+            #expect(!title.contains("..."), "three periods instead of an ellipsis: \(title)")
+            #expect(!title.dropLast().contains("…"), "ellipsis is not trailing: \(title)")
+            #expect(!title.contains(":") || title.hasPrefix("Desktop "), "stray colon: \(title)")
+            let words = title.replacingOccurrences(of: "…", with: "").split(separator: " ").map(String.init)
+            for (index, word) in words.enumerated() {
+                guard let first = word.first, first.isLetter else { continue }
+                let isEdge = index == 0 || index == words.count - 1
+                if lowercaseWords.contains(word.lowercased()), !isEdge {
+                    #expect(first.isLowercase, "\(word) should be lowercase in: \(title)")
+                } else {
+                    #expect(first.isUppercase, "\(word) should be capitalized in: \(title)")
+                }
+            }
+        }
     }
 
     private func baseInput(downloadProgress: Double? = nil) -> MenuModelInput {

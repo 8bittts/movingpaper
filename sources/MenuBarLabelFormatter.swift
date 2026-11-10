@@ -14,6 +14,11 @@ enum MenuBarLabelFormatter {
         return prefix + truncateMiddle(fileName, maxLength: available)
     }
 
+    /// Status text for a download in flight, shared by the menu and the overlay.
+    static func downloadStatus(progress: Double) -> String {
+        "Downloading \(Int(progress * 100))%"
+    }
+
     static func displayHeaderTitle(_ title: String) -> String {
         truncateMiddle(title, maxLength: maxVisibleCharacters)
     }

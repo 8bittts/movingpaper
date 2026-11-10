@@ -81,6 +81,10 @@ final class StatusBarController: NSObject {
         if let displayID = command.displayID {
             item.tag = Int(displayID)
         }
+        if let symbolName = command.symbolName {
+            // Decorative: the title already names the action for VoiceOver.
+            item.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)
+        }
         return item
     }
 
@@ -161,7 +165,6 @@ final class StatusBarController: NSObject {
             input.placeholderString = "https://youtube.com/watch?v=..."
             // A pasted clipboard value hides the placeholder, so the field needs its own name.
             input.setAccessibilityLabel("YouTube URL")
-            input.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
             input.lineBreakMode = .byTruncatingMiddle
             input.usesSingleLineMode = true
             // Prefill only a YouTube URL: any other clipboard text is not what

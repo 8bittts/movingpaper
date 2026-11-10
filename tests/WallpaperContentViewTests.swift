@@ -139,9 +139,9 @@ struct WallpaperContentViewTests {
         )
         #expect(
             GIFWallpaperView.playbackMessage(status: CGImageAnimationStatus.unsupportedFormat.rawValue)
-                == "That image format cannot be animated."
+                == "That image format can't be animated."
         )
-        #expect(GIFWallpaperView.playbackMessage(status: 0) == "The GIF could not be played.")
+        #expect(GIFWallpaperView.playbackMessage(status: 0) == "The GIF couldn't be played.")
     }
 
     private static func makePixel() -> CGImage {

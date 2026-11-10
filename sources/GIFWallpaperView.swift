@@ -117,17 +117,17 @@ final class GIFWallpaperView: NSView, WallpaperContentView {
     static func playbackMessage(status: OSStatus) -> String {
         switch status {
         case CGImageAnimationStatus.parameterError.rawValue:
-            return "The GIF could not be opened."
+            return "The GIF couldn't be opened."
         case CGImageAnimationStatus.corruptInputImage.rawValue:
             return "The GIF file is unreadable."
         case CGImageAnimationStatus.unsupportedFormat.rawValue:
-            return "That image format cannot be animated."
+            return "That image format can't be animated."
         case CGImageAnimationStatus.incompleteInputImage.rawValue:
             return "The GIF file is incomplete."
         case CGImageAnimationStatus.allocationFailure.rawValue:
-            return "Not enough memory to play that GIF."
+            return "There isn't enough memory to play that GIF."
         default:
-            return "The GIF could not be played."
+            return "The GIF couldn't be played."
         }
     }
 }

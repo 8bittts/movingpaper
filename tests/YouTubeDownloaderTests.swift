@@ -68,14 +68,14 @@ struct YouTubeDownloaderTests {
             resolveBinary: { nil }
         )
         let outcome = await downloader.download(youtubeURL: "https://example.com/not-youtube")
-        #expect(outcome == .failure("Invalid YouTube URL"))
+        #expect(outcome == .failure("That doesn't look like a YouTube URL."))
     }
 
     @Test func missingBinaryFailsWithAnInstallMessage() async throws {
         let sandbox = try Sandbox(script: "exit 0")
         let downloader = YouTubeDownloader(cacheDirectory: sandbox.cache, resolveBinary: { nil })
         let outcome = await downloader.download(youtubeURL: Self.videoURL)
-        #expect(outcome == .failure("Could not download yt-dlp. Check your internet connection."))
+        #expect(outcome == .failure("MovingPaper couldn't install its YouTube downloader. Check your internet connection."))
     }
 
     @Test func successReturnsTheCachedFileAndReportsProgress() async throws {
@@ -129,7 +129,7 @@ struct YouTubeDownloaderTests {
     @Test func aCleanExitWithoutAnOutputFileIsAFailure() async throws {
         let sandbox = try Sandbox(script: "exit 0")
         let outcome = await sandbox.makeDownloader().download(youtubeURL: Self.videoURL)
-        #expect(outcome == .failure("Download completed but file not found"))
+        #expect(outcome == .failure("The download finished, but the video file is missing."))
     }
 
     @Test func aBinaryThatCannotLaunchIsAFailure() async throws {
@@ -142,7 +142,7 @@ struct YouTubeDownloaderTests {
             Issue.record("expected a launch failure")
             return
         }
-        #expect(message.hasPrefix("Failed to run yt-dlp"))
+        #expect(message.hasPrefix("The YouTube downloader couldn't start."))
         #expect(downloader.progress == nil)
     }
 
@@ -219,9 +219,9 @@ struct YouTubeDownloaderTests {
     @Test func failureMessageTakesTheLastErrorLine() {
         let stderr = Data("ERROR: first\nWARNING: noise\nERROR: [youtube] abc: Private video\n".utf8)
         #expect(YouTubeDownloader.failureMessage(fromStandardError: stderr) == "[youtube] abc: Private video")
-        #expect(YouTubeDownloader.failureMessage(fromStandardError: Data("no marker".utf8)) == "Download failed")
-        #expect(YouTubeDownloader.failureMessage(fromStandardError: Data("ERROR:  \n".utf8)) == "Download failed")
-        #expect(YouTubeDownloader.failureMessage(fromStandardError: Data()) == "Download failed")
+        #expect(YouTubeDownloader.failureMessage(fromStandardError: Data("no marker".utf8)) == "The download failed.")
+        #expect(YouTubeDownloader.failureMessage(fromStandardError: Data("ERROR:  \n".utf8)) == "The download failed.")
+        #expect(YouTubeDownloader.failureMessage(fromStandardError: Data()) == "The download failed.")
     }
 }
 

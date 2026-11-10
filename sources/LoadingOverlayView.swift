@@ -1,101 +1,36 @@
 import AppKit
 import SwiftUI
 
-// MARK: - Brand Palette (night sky)
-
-private enum Brand {
-    static let bg = Color(red: 0.04, green: 0.06, blue: 0.14)
-    static let accent = Color(red: 0.55, green: 0.65, blue: 0.90)
-    static let textDim = Color(white: 0.68)
-    static let textBright = Color(white: 1.0)
-}
-
 // MARK: - SwiftUI View
 
+/// Transient status for a wallpaper that is loading: a label over a system
+/// progress indicator, on the platform's own surface.
+///
+/// Everything here is a system style. Text styles, vibrant foreground colors and
+/// the standard `ProgressView` follow Dynamic Type sizes, light and dark
+/// appearance, Increase Contrast, Reduce Transparency and Reduce Motion with no
+/// code of our own.
 struct LoadingOverlayView: View {
     let message: String
     let progress: Double?
 
-    // Honor the system accessibility preferences: no sweeping motion under
-    // Reduce Motion, no translucency under Reduce Transparency. NSHostingView
-    // forwards both system values into SwiftUI automatically.
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @State private var phase: CGFloat = 0
-
     var body: some View {
         VStack(spacing: 10) {
-            shimmerText
+            Text(message)
+                .font(.headline)
+                .foregroundStyle(.primary)
+                .monospacedDigit()
             if let progress {
-                progressBar(value: progress)
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .frame(width: 180)
             } else {
                 ProgressView()
-                    .progressViewStyle(.circular)
-                    .tint(Brand.accent)
                     .controlSize(.small)
             }
         }
         .padding(.horizontal, 28)
         .padding(.vertical, 18)
-        .background(pill)
-        .onAppear {
-            // Reduce Motion: leave the sheen parked and show static text.
-            guard !reduceMotion else { return }
-            withAnimation(.linear(duration: 2.2).repeatForever(autoreverses: false)) {
-                phase = 1
-            }
-        }
-    }
-
-    // Text with a sheen that sweeps left-to-right. Under Reduce Motion the sweep
-    // is dropped and the text is shown statically at full brightness.
-    private var shimmerText: some View {
-        Text(message)
-            .font(.system(.body, design: .rounded).weight(.semibold))
-            .foregroundStyle(reduceMotion ? Brand.textBright : Brand.textDim)
-            .overlay {
-                if !reduceMotion {
-                    sheen.mask(textMask)
-                }
-            }
-    }
-
-    private var textMask: some View {
-        Text(message)
-            .font(.system(.body, design: .rounded).weight(.semibold))
-    }
-
-    private var sheen: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let band = w * 0.45
-            LinearGradient(
-                colors: [.clear, Brand.textBright, .clear],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-            .frame(width: band)
-            .offset(x: -band + phase * (w + band))
-        }
-    }
-
-    // Standard determinate indicator — brings built-in Reduce Motion handling,
-    // correct layout direction, and VoiceOver progress value for free.
-    private func progressBar(value: Double) -> some View {
-        ProgressView(value: value)
-            .progressViewStyle(.linear)
-            .tint(Brand.accent)
-            .frame(width: 180)
-    }
-
-    private var pill: some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .fill(Brand.bg.opacity(reduceTransparency ? 1.0 : 0.92))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Brand.accent.opacity(0.12), lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(0.5), radius: 24, y: 8)
     }
 }
 
@@ -124,20 +59,21 @@ final class LoadingOverlayController {
 
         let hosting = NSHostingView(rootView: content)
         let window = NSPanel(
-            contentRect: NSRect(origin: .zero, size: Self.panelSize(fitting: hosting)),
+            contentRect: NSRect(origin: .zero, size: hosting.fittingSize),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
         window.isOpaque = false
         window.backgroundColor = .clear
-        window.hasShadow = false
+        // The system draws the shadow around the surface's rounded shape.
+        window.hasShadow = true
         window.ignoresMouseEvents = true
         window.isReleasedWhenClosed = false
         window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
 
-        window.contentView = hosting
+        window.contentView = Self.makeSurface(containing: hosting)
 
         centerOnScreen(window)
 
@@ -208,15 +144,41 @@ final class LoadingOverlayController {
 
     private func resizePanel() {
         guard let panel, let hostingView else { return }
-        panel.setContentSize(Self.panelSize(fitting: hostingView))
+        panel.setContentSize(hostingView.fittingSize)
         centerOnScreen(panel)
     }
 
-    /// The pill's fitting size, never narrower than the progress bar needs, so
-    /// the panel does not jitter as the percentage text changes width.
-    private static func panelSize(fitting hostingView: NSHostingView<LoadingOverlayView>) -> NSSize {
-        let size = hostingView.fittingSize
-        return NSSize(width: max(size.width, 220), height: size.height)
+    private static let cornerRadius: CGFloat = 20
+
+    /// The surface behind the content: Liquid Glass where the system has it, the
+    /// standard HUD material before that. Both are AppKit views because they
+    /// composite against what is behind the window; a SwiftUI glass effect in a
+    /// transparent panel has nothing to sample and draws a flat slab.
+    private static func makeSurface(containing content: NSView) -> NSView {
+        if #available(macOS 26.0, *) {
+            let glass = NSGlassEffectView()
+            // Regular, not clear: the overlay carries text, and regular glass keeps
+            // text legible over any wallpaper (HIG: Materials).
+            glass.style = .regular
+            glass.cornerRadius = cornerRadius
+            glass.contentView = content
+            return glass
+        }
+        let material = NSVisualEffectView()
+        material.material = .hudWindow
+        material.blendingMode = .behindWindow
+        material.state = .active
+        // The HUD material is a dark surface: pin the dark vibrant appearance so
+        // the label and indicator keep their contrast in light mode too.
+        material.appearance = NSAppearance(named: .vibrantDark)
+        material.wantsLayer = true
+        material.layer?.cornerRadius = cornerRadius
+        material.layer?.cornerCurve = .continuous
+        material.layer?.masksToBounds = true
+        content.frame = material.bounds
+        content.autoresizingMask = [.width, .height]
+        material.addSubview(content)
+        return material
     }
 
     private func centerOnScreen(_ window: NSPanel) {

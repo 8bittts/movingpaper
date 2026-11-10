@@ -80,7 +80,7 @@ final class YouTubeDownloader {
         onProgress: @escaping ProgressHandler
     ) async -> DownloadOutcome {
         guard let videoID = YouTubeURLParser.videoID(from: youtubeURL) else {
-            return .failure("Invalid YouTube URL")
+            return .failure("That doesn't look like a YouTube URL.")
         }
 
         let output = cacheDirectory.appending(path: "\(videoID).mp4")
@@ -90,7 +90,7 @@ final class YouTubeDownloader {
         }
 
         guard let ytdlp = await resolveBinary() else {
-            return .failure("Could not download yt-dlp. Check your internet connection.")
+            return .failure("MovingPaper couldn't install its YouTube downloader. Check your internet connection.")
         }
         guard !Task.isCancelled else { return .cancelled }
 
@@ -126,7 +126,7 @@ final class YouTubeDownloader {
         switch result {
         case .succeeded:
             guard FileManager.default.fileExists(atPath: outputPath) else {
-                return .failure("Download completed but file not found")
+                return .failure("The download finished, but the video file is missing.")
             }
             return .success(output)
         case .failed(let message):
@@ -197,11 +197,10 @@ final class YouTubeDownloader {
     /// The text after yt-dlp's last "ERROR:" marker, or a generic message.
     nonisolated static func failureMessage(fromStandardError data: Data) -> String {
         let text = String(decoding: data, as: UTF8.self)
-        guard let marker = text.range(of: "ERROR:", options: .backwards) else {
-            return "Download failed"
-        }
+        let fallback = "The download failed."
+        guard let marker = text.range(of: "ERROR:", options: .backwards) else { return fallback }
         let message = text[marker.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
-        return message.isEmpty ? "Download failed" : message
+        return message.isEmpty ? fallback : message
     }
 
     private func runYTDLP(binary: String, downloadID: UUID, arguments: [String]) async -> RunResult {
@@ -250,7 +249,7 @@ final class YouTubeDownloader {
                     }
                     self.process = nil
                     if let launchError = exit.launchError {
-                        continuation.resume(returning: .failed("Failed to run yt-dlp: \(launchError)"))
+                        continuation.resume(returning: .failed("The YouTube downloader couldn't start. \(launchError)"))
                     } else if self.activeDownloadID != downloadID {
                         continuation.resume(returning: .cancelled)
                     } else if exit.status == 0 {

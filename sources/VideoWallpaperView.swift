@@ -79,7 +79,7 @@ final class VideoWallpaperView: NSView, WallpaperContentView {
                 let (_, isPlayable) = try await asset.load(.duration, .isPlayable)
                 guard !Task.isCancelled else { return }
                 guard isPlayable else {
-                    self?.onFailure?(url, "The video could not be played.")
+                    self?.onFailure?(url, "The video couldn't be played.")
                     return
                 }
                 self?.install(asset: asset, url: url, resumeTime: resumeTime)
@@ -107,7 +107,7 @@ final class VideoWallpaperView: NSView, WallpaperContentView {
                 case .readyToPlay:
                     self?.seekToPendingResumeTime()
                 case .failed:
-                    let message = queuePlayer.error?.localizedDescription ?? "The video could not be played."
+                    let message = queuePlayer.error?.localizedDescription ?? "The video couldn't be played."
                     self?.onFailure?(url, message)
                 default:
                     break

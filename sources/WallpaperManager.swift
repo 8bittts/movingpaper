@@ -185,7 +185,7 @@ final class WallpaperManager {
             panel.allowedContentTypes = [.gif, .mpeg4Movie, .quickTimeMovie, .movie]
             panel.allowsMultipleSelection = false
             panel.canChooseDirectories = false
-            panel.message = "Choose a GIF or video file for your MovingPaper wallpaper"
+            panel.message = "Choose a GIF or video file to use as your wallpaper."
 
             guard panel.runModal() == .OK, let url = panel.url else { return }
             setWallpaper(url: url, for: displayID)
@@ -301,7 +301,7 @@ final class WallpaperManager {
             return
         }
         loadingOverlay.show(
-            message: "Downloading \(Int(progress * 100))%",
+            message: MenuBarLabelFormatter.downloadStatus(progress: progress),
             progress: progress,
             on: screen(for: displayID)
         )
@@ -442,8 +442,8 @@ final class WallpaperManager {
 
             if failedCount > 0 {
                 let message = failedCount == 1
-                    ? "A YouTube wallpaper could not be redownloaded."
-                    : "\(failedCount) YouTube wallpapers could not be redownloaded."
+                    ? "A YouTube wallpaper couldn't be downloaded again."
+                    : "\(failedCount) YouTube wallpapers couldn't be downloaded again."
                 AppPresentation.showAlert(
                     title: "Couldn't Restore Some Wallpapers",
                     message: message,
