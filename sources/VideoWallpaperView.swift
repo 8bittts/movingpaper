@@ -151,7 +151,7 @@ final class VideoWallpaperView: NSView, WallpaperContentView {
         guard endObserver == nil else { return }
         Log.playback.error("AVPlayerLooper failed; falling back to rewind-at-end")
         endObserver = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
+            forName: AVPlayerItem.didPlayToEndTimeNotification,
             object: nil,
             queue: .main
         ) { [weak self] notification in

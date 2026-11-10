@@ -27,7 +27,7 @@ let sparkleSearchPath = URL(fileURLWithPath: #filePath)
 let package = Package(
     name: "MovingPaper",
     platforms: [
-        .macOS(.v15),
+        .macOS("27.0"),
     ],
     products: [
         .executable(name: "MovingPaper", targets: ["MovingPaper"]),

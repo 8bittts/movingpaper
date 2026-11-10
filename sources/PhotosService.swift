@@ -139,18 +139,15 @@ enum PhotosService {
         return exportSession
     }
 
+    /// Cancelling the calling task cancels the export, so the timeout around
+    /// this call needs no handler of its own.
     private static func export(session: AVAssetExportSession, to destURL: URL) async -> Bool {
-        nonisolated(unsafe) let session = session
-        return await withTaskCancellationHandler(operation: {
-            do {
-                try await session.export(to: destURL, as: .mp4)
-                return true
-            } catch {
-                return false
-            }
-        }, onCancel: {
-            session.cancelExport()
-        })
+        do {
+            try await session.export(to: destURL, as: .mp4)
+            return true
+        } catch {
+            return false
+        }
     }
 }
 

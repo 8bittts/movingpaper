@@ -98,7 +98,10 @@ extension MovingPaperUpdater: SPUUpdaterDelegate {
     }
 
     func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {
-        let message = (error as NSError).localizedDescription
+        let error = error as NSError
+        // Sparkle ends a check that found nothing through this path too.
+        if error.domain == SUSparkleErrorDomain, error.code == Int(SUError.noUpdateError.rawValue) { return }
+        let message = error.localizedDescription
         Log.updater.error("Sparkle aborted: \(message, privacy: .public)")
     }
 }

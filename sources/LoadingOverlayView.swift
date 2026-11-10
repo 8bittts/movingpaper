@@ -150,35 +150,17 @@ final class LoadingOverlayController {
 
     private static let cornerRadius: CGFloat = 20
 
-    /// The surface behind the content: Liquid Glass where the system has it, the
-    /// standard HUD material before that. Both are AppKit views because they
-    /// composite against what is behind the window; a SwiftUI glass effect in a
+    /// The Liquid Glass surface behind the content. An AppKit view because it
+    /// composites against what is behind the window; a SwiftUI glass effect in a
     /// transparent panel has nothing to sample and draws a flat slab.
     private static func makeSurface(containing content: NSView) -> NSView {
-        if #available(macOS 26.0, *) {
-            let glass = NSGlassEffectView()
-            // Regular, not clear: the overlay carries text, and regular glass keeps
-            // text legible over any wallpaper (HIG: Materials).
-            glass.style = .regular
-            glass.cornerRadius = cornerRadius
-            glass.contentView = content
-            return glass
-        }
-        let material = NSVisualEffectView()
-        material.material = .hudWindow
-        material.blendingMode = .behindWindow
-        material.state = .active
-        // The HUD material is a dark surface: pin the dark vibrant appearance so
-        // the label and indicator keep their contrast in light mode too.
-        material.appearance = NSAppearance(named: .vibrantDark)
-        material.wantsLayer = true
-        material.layer?.cornerRadius = cornerRadius
-        material.layer?.cornerCurve = .continuous
-        material.layer?.masksToBounds = true
-        content.frame = material.bounds
-        content.autoresizingMask = [.width, .height]
-        material.addSubview(content)
-        return material
+        let glass = NSGlassEffectView()
+        // Regular, not clear: the overlay carries text, and regular glass keeps
+        // text legible over any wallpaper (HIG: Materials).
+        glass.style = .regular
+        glass.cornerRadius = cornerRadius
+        glass.contentView = content
+        return glass
     }
 
     private func centerOnScreen(_ window: NSPanel) {

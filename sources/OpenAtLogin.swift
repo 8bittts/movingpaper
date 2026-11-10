@@ -1,7 +1,7 @@
 import ServiceManagement
 
 /// Login-item registration for the menu-bar extra.
-/// `SMAppService.mainApp` is the supported API on macOS 13+ (deployment is 15).
+/// `SMAppService.mainApp` is the supported login-item API.
 enum OpenAtLogin {
     static var isEnabled: Bool {
         SMAppService.mainApp.status == .enabled

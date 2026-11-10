@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   test:
-    name: Build & Test
+    name: Compile
     runs-on: macos-26
     timeout-minutes: 15
     steps:
@@ -32,8 +32,9 @@ jobs:
       - name: Swift version
         run: swift --version
 
-      - name: Build (debug)
-        run: swift build
-
-      - name: Test
-        run: swift test --parallel
+      # The app requires macOS 27 and no hosted runner runs it yet, so this job
+      # compiles the app and its tests but cannot launch them. The test gate is
+      # ./scripts/smoke-test.sh on a macOS 27 Mac. Restore `swift test` here when
+      # a macOS 27 image exists.
+      - name: Compile app and tests
+        run: swift build --build-tests

@@ -61,14 +61,17 @@ verify_app_bundle_shape() {
     require_file "$plist"
     require_executable "$binary"
     require_dir "${app}/Contents/Frameworks/Sparkle.framework"
+    require_file "${app}/Contents/Resources/Assets.car"
     require_file "${app}/Contents/Resources/${APP_NAME}.icns"
 
     assert_plist_value "$plist" "CFBundleIdentifier" "$BUNDLE_ID"
     assert_plist_value "$plist" "CFBundleExecutable" "$APP_NAME"
     assert_plist_value "$plist" "CFBundlePackageType" "APPL"
     assert_plist_value "$plist" "NSPrincipalClass" "NSApplication"
+    assert_plist_value "$plist" "CFBundleIconName" "$APP_NAME"
     assert_plist_value "$plist" "SURequireSignedFeed" "true"
     assert_plist_value "$plist" "SUVerifyUpdateBeforeExtraction" "true"
+    assert_plist_value "$plist" "LSMinimumSystemVersion" "$(plist_value sources/Resources/Info.plist LSMinimumSystemVersion)"
 
     otool -L "$binary" | grep -q "@rpath/Sparkle.framework" || fail "${binary} is not linked to bundled Sparkle via @rpath"
 }
@@ -141,6 +144,13 @@ verify_release_artifacts() {
     assert_contains "$appcast" "<sparkle:version>${build_number}</sparkle:version>"
     assert_contains "$appcast" "MovingPaper-${version}.dmg"
     assert_contains "$appcast" "length=\"${dmg_bytes}\""
+    # Sparkle offers an update to every Mac the appcast does not rule out, so the
+    # feed must carry the bundle's minimum system version or older Macs install
+    # an app that cannot launch.
+    local minimum_system
+    minimum_system="$(plist_value "$plist" LSMinimumSystemVersion)"
+    [ -n "$minimum_system" ] || fail "Release app has no LSMinimumSystemVersion"
+    assert_contains "$appcast" "<sparkle:minimumSystemVersion>${minimum_system}</sparkle:minimumSystemVersion>"
     assert_contains "$appcast" "sparkle-signatures:"
     assert_contains "$appcast" "sparkle:edSignature="
     tools/sparkle/bin/sign_update --verify "$appcast" >/dev/null 2>&1 || fail "Sparkle appcast signature verification failed"
@@ -155,6 +165,7 @@ require_file "scripts/build_and_run.sh"
 require_file "scripts/build-dmg.sh"
 require_executable "tools/sparkle/bin/sign_update"
 require_file "build/movingpaper.png"
+require_file "build/MovingPaper.icon/icon.json"
 require_file "build/yen.png"
 require_file "videos/test-00.gif"
 require_file "videos/test-01.mp4"
