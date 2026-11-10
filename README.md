@@ -16,9 +16,13 @@
 
 ## Why MovingPaper?
 
-Your desktop is yours. Why should it be a static photo?
+Your desktop is yours.
+Why should it be a static photo?
 
-MovingPaper turns your background into something alive, like a looping video, an animated GIF, a YouTube clip, or a random video from your Apple Photos library. Everything else works exactly the same: Icons, right-click menus, drag-and-drop, all of it. Your Moving (Wall) Paper animation sits underneath. I call it *MovingPaper*.
+MovingPaper turns your background into something alive, like a looping video, an animated GIF, a YouTube clip, or a random video from your Apple Photos library.
+Everything else works exactly the same: Icons, right-click menus, drag-and-drop, all of it.
+Your Moving (Wall) Paper animation sits underneath.
+I call it *MovingPaper*.
 
 **A few ways people use it:**
 
@@ -38,7 +42,8 @@ It's the kind of app that makes you smile every time you minimize a window.
 [**Download MovingPaper v0.044**](https://github.com/8bittts/movingpaper/releases/download/v0.044/MovingPaper-0.044.dmg)
 <!-- /download-link -->
 
-Open the `.dmg`, drag **MovingPaper** to Applications, launch it. Look for the moon icon in your menu bar -- that's it.
+Open the `.dmg`, drag **MovingPaper** to Applications, launch it.
+Look for the moon icon in your menu bar -- that's it.
 
 > Apple Silicon (arm64). Code-signed with Developer ID and notarized by Apple. Auto-updates via Sparkle.
 
@@ -55,13 +60,15 @@ brew tap 8bittts/movingpaper https://github.com/8bittts/movingpaper
 brew install --cask 8bittts/movingpaper/movingpaper
 ```
 
-The Cask formula in [`Casks/movingpaper.rb`](Casks/movingpaper.rb) is bumped by hand after a release -- `release-movingpaper.sh` does not touch it -- so the tap can lag the latest DMG. Sparkle auto-update keeps installed apps current between Cask bumps.
+The Cask formula in [`Casks/movingpaper.rb`](Casks/movingpaper.rb) is bumped by hand after a release -- `release-movingpaper.sh` does not touch it -- so the tap can lag the latest DMG.
+Sparkle auto-update keeps installed apps current between Cask bumps.
 
 ---
 
 ## What It Does
 
-Plays a looping video or GIF as your desktop background. Everything on your desktop still works normally -- the animation sits underneath.
+Plays a looping video or GIF as your desktop background.
+Everything on your desktop still works normally -- the animation sits underneath.
 
 | Source | How |
 |--------|-----|
@@ -72,7 +79,7 @@ Plays a looping video or GIF as your desktop background. Everything on your desk
 
 ## Features
 
-- **Resilient async loading** -- stale YouTube and Photos results are cancelled or ignored so your newest wallpaper choice wins
+- **Resilient async loading** -- stale YouTube and Photos results are canceled or ignored so your newest wallpaper choice wins
 - **Loading overlay** -- on-brand shimmer pill floats above all windows so you always know what's happening
 - **Playback errors** -- missing or unreadable files show an alert instead of a blank desktop
 - **Per-desktop wallpapers** -- different wallpaper on each macOS Space and monitor, including separate Spaces per display
@@ -118,7 +125,9 @@ swift test
 
 The full script matrix, the release flow and the smoke-test contract are in [`_docs/05-infrastructure.md`](_docs/05-infrastructure.md) and [`_docs/09-quality.md`](_docs/09-quality.md).
 
-Don't have any videos or GIFs on-hand? The `videos/` folder ships with ten sample wallpapers you can load into MovingPaper to try it out. More will be added over time.
+Don't have any videos or GIFs on-hand?
+The `videos/` folder ships with ten sample wallpapers you can load into MovingPaper to try it out.
+More will be added over time.
 
 ---
 
@@ -129,7 +138,8 @@ The module map, the coordinator seams and the tech stack are in [`_docs/01-archi
 
 ## Contributing
 
-Fork, branch, `swift test`, PR. One feature or fix per PR.
+Fork, branch, `swift test`, PR.
+One feature or fix per PR.
 
 ## License
 

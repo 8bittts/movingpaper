@@ -12,26 +12,26 @@ Sparkle 2.10.1 is vendored for updates; distribution is a notarized DMG and a Ho
 ## How the wallpaper is drawn
 
 A borderless `NSPanel` (`WallpaperPanel`) sits at `desktopWindow + 1`, above the system wallpaper and below Finder icons, with `ignoresMouseEvents = true` so the desktop stays interactive.
-`VideoWallpaperView` loops video and `GIFWallpaperView` animates GIFs with native frame timing.
+`VideoPlayerNSView` (`sources/VideoWallpaperView.swift`) loops video and `GIFAnimationNSView` (`sources/GIFWallpaperView.swift`) animates GIFs with native frame timing.
 Clip and Space changes reuse the on-screen panel so the system desktop never flashes through.
-`ManagedDisplaySpaces` reads macOS's managed display-space snapshot, with a `CGSGetActiveSpace` fallback, so each display's active Space is known even when displays keep separate Spaces.
+`ManagedDisplaySpacesSnapshot` (`sources/ManagedDisplaySpaces.swift`) reads macOS's managed display-space snapshot, with a `CGSGetActiveSpace` fallback, so each display's active Space is known even when displays keep separate Spaces.
 `WallpaperWindowController` owns one panel per display and pauses playback while a fullscreen app occludes it.
 
 ## Coordinator and seams
 
 `WallpaperManager` is the coordinator, and each extracted helper owns one seam:
 
-| Seam                 | Type                                          | Owns                                                                                           |
-| -------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Routing              | `WallpaperWindowRouter`                       | Hosts video and GIF directly in AppKit, never back through SwiftUI                             |
-| Persistence          | `WallpaperPersistenceStore`                   | Saved wallpapers per display and Space, with versioned migrations covered by tests             |
-| Presentation         | `AppPresentation`                             | Activation policy: accessory by default, foregrounded for Sparkle UI, restored afterwards      |
-| Cache cleanup        | `CacheJanitor`                                | Evicts cached media; every enrolled cache needs a recovery story for an evicted file           |
-| Power state          | `PowerStateMonitor`                           | Pauses in place on Low Power Mode and thermal throttling                                       |
-| Request cancellation | `WallpaperRequestCoordinator`                 | The newest user choice wins; stale YouTube and Photos results are cancelled or ignored         |
-| Serialization        | `AsyncSerialGate`                             | FIFO async mutex that serializes downloads                                                     |
+| Seam                 | Type                          | Owns                                                                                      |
+| -------------------- | ----------------------------- | ----------------------------------------------------------------------------------------- |
+| Routing              | `WallpaperWindowRouter`       | Hosts video and GIF directly in AppKit, never back through SwiftUI                        |
+| Persistence          | `WallpaperPersistenceStore`   | Saved wallpapers per display and Space, with versioned migrations covered by tests        |
+| Presentation         | `AppPresentation`             | Activation policy: accessory by default, foregrounded for Sparkle UI, restored afterwards |
+| Cache cleanup        | `CacheJanitor`                | Evicts cached media; every enrolled cache needs a recovery story for an evicted file      |
+| Power state          | `PowerStateMonitor`           | Pauses in place on Low Power Mode and thermal throttling                                  |
+| Request cancellation | `WallpaperRequestCoordinator` | The newest user choice wins; stale YouTube and Photos results are canceled or ignored     |
+| Serialization        | `AsyncSerialGate`             | FIFO async mutex that serializes downloads                                                |
 
-`WallpaperState` and `WallpaperTypes` hold the model; `AppPaths` resolves the cache and support directories; `Log` wraps unified logging.
+`WallpaperState` and the `WallpaperMode`, `DesktopKey` and `WallpaperFileType` types in `sources/WallpaperTypes.swift` hold the model; `AppPaths` resolves the cache and support directories; `Log` wraps unified logging.
 
 ## Sources
 

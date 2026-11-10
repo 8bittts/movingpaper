@@ -23,7 +23,7 @@ Status-menu structure lives in `MenuSnapshot`; tests cover labels without launch
   `MovingPaperApp` keeps a hidden `Settings { EmptyView() }` scene for lifecycle only and replaces `.appSettings` with an empty command group so Cmd-, cannot open a blank window.
   The menu must not advertise Settings until a real preferences UI exists.
 - The menu-bar extra icon is a template SF Symbol (`cloud.moon.fill`).
-  Keep the colour night-sky PNG for the app icon only; do not set `isTemplate = false` on the status item.
+  Keep the color night-sky PNG for the app icon only; do not set `isTemplate = false` on the status item.
 - `WallpaperManager` stays the coordinator; extracted helpers each own one seam (routing, persistence, presentation, cache cleanup, power state, request cancellation).
   Do not route wallpaper rendering back through SwiftUI — `WallpaperWindowRouter` hosts video/GIF directly in AppKit.
 - A `WallpaperPersistenceStore` schema change is not done until a test covers the new migration path.
