@@ -7,26 +7,33 @@ enum YTDLPInstaller {
     /// against the downloaded binary before it's installed and made executable.
     /// Refresh via `curl -fsSL https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest`
     /// when YouTube site changes break the current pinned version.
-    nonisolated static let pinnedVersion = "2026.03.17"
-    nonisolated static let pinnedSHA256 = "e80c47b3ce712acee51d5e3d4eace2d181b44d38f1942c3a32e3c7ff53cd9ed5"
+    static let pinnedVersion = "2026.03.17"
+    static let pinnedSHA256 = "e80c47b3ce712acee51d5e3d4eace2d181b44d38f1942c3a32e3c7ff53cd9ed5"
 
-    nonisolated static func sha256Hex(of data: Data) -> String {
+    static func sha256Hex(of data: Data) -> String {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
-    /// Path to a dev-tree yt-dlp binary (arbitrary version, trusted as-is).
-    private nonisolated static var developerBinaryPath: String? {
+    #if DEBUG
+    /// A dev-tree yt-dlp binary, relative to the working directory. Any version,
+    /// trusted as-is, so only debug builds look for it: a release build must not
+    /// run whatever sits at a path the launching directory controls.
+    private static var developerBinaryPath: String? {
         let devPath = "tools/yt-dlp/yt-dlp"
         return FileManager.default.fileExists(atPath: devPath) ? devPath : nil
     }
+    #endif
 
-    /// Resolve a trusted yt-dlp binary path: the dev binary if present, else an
-    /// installed copy **re-verified against the pinned SHA-256** (so a corrupt or
-    /// pin-stale binary is never executed and is re-downloaded), else a fresh
-    /// download+verify+install. `nonisolated` so the 40 MB hash + write stay off
-    /// the main actor; only reached on a cache miss, so cached videos never pay it.
-    nonisolated static func ensureYTDLP() async -> String? {
+    /// Resolve a trusted yt-dlp binary path: an installed copy **re-verified
+    /// against the pinned SHA-256** (so a corrupt or pin-stale binary is never
+    /// executed and is re-downloaded), else a fresh download+verify+install.
+    /// Debug builds prefer a dev-tree binary. Runs off the main actor, so the
+    /// 40 MB hash + write never block it; only reached on a cache miss, so
+    /// cached videos never pay it.
+    static func ensureYTDLP() async -> String? {
+        #if DEBUG
         if let devPath = developerBinaryPath { return devPath }
+        #endif
 
         let installURL = AppPaths.ytdlpBinary
         let installedPath = installURL.path(percentEncoded: false)
@@ -43,7 +50,7 @@ enum YTDLPInstaller {
         return await downloadAndInstallYTDLP()
     }
 
-    private nonisolated static func downloadAndInstallYTDLP() async -> String? {
+    private static func downloadAndInstallYTDLP() async -> String? {
         let installURL = AppPaths.ytdlpBinary
         let dir = installURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

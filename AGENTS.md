@@ -30,7 +30,7 @@ Status-menu structure lives in `MenuSnapshot`; tests cover labels without launch
 - New async wallpaper sources go through `WallpaperRequestCoordinator` so the newest user choice wins, and long-running subprocess or network work must cooperate with `withTaskCancellationHandler` so cancellation actually tears it down.
 - Do not enroll a cache in `CacheJanitor` without a recovery story for an evicted file.
 - `YTDLPInstaller` pins yt-dlp by version and hash — bump `pinnedVersion` and `pinnedSHA256` together.
-  `YouTubeDownloader` exposes the same values as `pinnedYTDLPVersion` / `pinnedYTDLPSHA256`.
+  It trusts a dev-tree `tools/yt-dlp/yt-dlp` only under `#if DEBUG`; a release build must never run an unverified binary.
 - The vendored Sparkle framework is pinned in `tools/sparkle/VERSION` (version, build, binary SHA-256, and `required_paths`), and the `scripts/build-dmg.sh` preflight fails the build when the framework drifts from the pin.
   Re-vendoring updates every field of that file in the same change.
   Check for a new release with `gh api repos/sparkle-project/Sparkle/releases/latest`, which excludes prereleases by definition.

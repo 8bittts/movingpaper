@@ -1,6 +1,4 @@
 import AppKit
-import AVFoundation
-import Combine
 
 /// Central coordinator: manages per-screen wallpaper windows, file selection,
 /// playback state, sound, space tracking, and power-aware pause/resume.
@@ -35,11 +33,6 @@ final class WallpaperManager {
     private var powerMonitor: PowerStateMonitor?
     private var systemPaused: Bool = false
     private let loadingOverlay = LoadingOverlayController()
-    /// Display whose YouTube download is currently in flight, so the progress
-    /// overlay (driven by a global `$state` observer with no per-call display
-    /// context) can center on the right screen.
-    private var activeDownloadDisplayID: CGDirectDisplayID?
-    private var downloadOverlayObserver: AnyCancellable?
     private let requestCoordinator = WallpaperRequestCoordinator()
     private let persistenceStore = WallpaperPersistenceStore()
     private var restoreTask: Task<Void, Never>?
@@ -59,7 +52,6 @@ final class WallpaperManager {
         observeScreenChanges()
         observeSpaceChanges()
         observePowerState()
-        observeDownloadState()
     }
 
     private func refreshManagedDisplaySpaces() {
@@ -124,14 +116,8 @@ final class WallpaperManager {
 
     /// Snapshot the status menu needs without exposing the downloader.
     func menuInput(canCheckForUpdates: Bool, openAtLogin: Bool) -> MenuModelInput {
-        let progress: Double?
-        if case .downloading(let value) = youtubeDownloader.state {
-            progress = value
-        } else {
-            progress = nil
-        }
-        return MenuModelInput(
-            downloadProgress: progress,
+        MenuModelInput(
+            downloadProgress: youtubeDownloader.progress,
             mode: mode,
             isMuted: isMuted,
             isPaused: isPaused,
@@ -263,11 +249,12 @@ final class WallpaperManager {
 
         let target = assignmentTarget(for: displayID)
         let originSpaceID = displayID.map { currentSpaceID(for: $0) } ?? 0
-        activeDownloadDisplayID = displayID
         cancelRestoreTask()
         requestCoordinator.start(for: target) { [weak self] token in
             guard let self else { return }
-            let outcome = await youtubeDownloader.download(youtubeURL: urlString)
+            let outcome = await youtubeDownloader.download(youtubeURL: urlString) { [weak self] progress in
+                self?.showDownloadProgress(progress, on: displayID)
+            }
             guard requestCoordinator.isCurrent(token, for: target) else { return }
 
             switch outcome {
@@ -405,24 +392,18 @@ final class WallpaperManager {
         return NSScreen.screens.first { $0.displayID == displayID }
     }
 
-    private func observeDownloadState() {
-        downloadOverlayObserver = youtubeDownloader.$state
-            .receive(on: RunLoop.main)
-            .sink { [weak self] state in
-                guard let self else { return }
-                switch state {
-                case .downloading(let progress):
-                    let pct = Int(progress * 100)
-                    self.loadingOverlay.show(
-                        message: "Downloading \(pct)%",
-                        progress: progress,
-                        on: self.screen(for: self.activeDownloadDisplayID)
-                    )
-                case .idle, .failed:
-                    self.loadingOverlay.hide()
-                    self.activeDownloadDisplayID = nil
-                }
-            }
+    /// Drives the overlay for one YouTube download: a fraction while it runs,
+    /// nil once it ends. Centered on the display the download is for.
+    private func showDownloadProgress(_ progress: Double?, on displayID: CGDirectDisplayID?) {
+        guard let progress else {
+            loadingOverlay.hide()
+            return
+        }
+        loadingOverlay.show(
+            message: "Downloading \(Int(progress * 100))%",
+            progress: progress,
+            on: screen(for: displayID)
+        )
     }
 
     // MARK: - Persistence
@@ -452,6 +433,12 @@ final class WallpaperManager {
         }
     }
 
+    /// Whether a restore redownload is still wanted: not resolved, not cleared,
+    /// and not replaced by a wallpaper the user has assigned since.
+    private func isAwaitingRedownload(_ key: DesktopKey) -> Bool {
+        pendingRedownloads[key] != nil && state.entries[key] == nil
+    }
+
     private func scheduleRestoreRedownloads(_ items: [WallpaperRedownloadRequest]) {
         guard !items.isEmpty else { return }
         cancelRestoreTask()
@@ -461,30 +448,31 @@ final class WallpaperManager {
             var failedCount = 0
 
             for item in items {
-                let key = item.key
-                let youtubeURL = item.youtubeURL
-
                 guard !Task.isCancelled else { return }
-                guard pendingRedownloads[key] != nil else { continue }
-                guard state.entries[key] == nil else { continue }
+                guard isAwaitingRedownload(item.key) else { continue }
 
-                guard case .success(let localURL) = await youtubeDownloader.download(youtubeURL: youtubeURL) else {
-                    guard !Task.isCancelled else { return }
-                    failedCount += 1
-                    continue
+                let outcome = await youtubeDownloader.download(youtubeURL: item.youtubeURL) { [weak self] progress in
+                    self?.showDownloadProgress(progress, on: nil)
                 }
-
                 guard !Task.isCancelled else { return }
-                guard pendingRedownloads[key] != nil else { continue }
-                guard state.entries[key] == nil else { continue }
 
-                state.setEntry(
-                    WallpaperEntry(localURL: localURL, youtubeOrigin: youtubeURL),
-                    for: key
-                )
-                pendingRedownloads[key] = nil
-                saveState()
-                rebuildAllWindows()
+                switch outcome {
+                case .success(let localURL):
+                    guard isAwaitingRedownload(item.key) else { continue }
+                    state.setEntry(
+                        WallpaperEntry(localURL: localURL, youtubeOrigin: item.youtubeURL),
+                        for: item.key
+                    )
+                    pendingRedownloads[item.key] = nil
+                    saveState()
+                    rebuildAllWindows()
+                case .failure:
+                    failedCount += 1
+                case .cancelled:
+                    // Cancelled from the menu: not a failure. The request stays
+                    // persisted, so the next launch retries it.
+                    break
+                }
             }
 
             if failedCount > 0 {
@@ -526,7 +514,6 @@ final class WallpaperManager {
         tearDownWindows()
         removeScreenObserver()
         removeSpaceObserver()
-        downloadOverlayObserver = nil
         powerMonitor?.stop()
         powerMonitor = nil
     }
