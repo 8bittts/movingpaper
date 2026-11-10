@@ -43,7 +43,7 @@ It's the kind of app that makes you smile every time you minimize a window.
 <!-- /download-link -->
 
 Open the `.dmg`, drag **MovingPaper** to Applications, launch it.
-Look for the moon icon in your menu bar -- that's it.
+Look for the MovingPaper icon -- the night sky -- in your menu bar. That's it.
 
 > Apple Silicon (arm64). Code-signed with Developer ID and notarized by Apple. Auto-updates via Sparkle.
 >

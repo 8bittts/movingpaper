@@ -22,8 +22,8 @@ Status-menu structure lives in `MenuSnapshot`; tests cover labels without launch
 - Do not reintroduce a visible Settings surface.
   `MovingPaperApp` keeps a hidden `Settings { EmptyView() }` scene for lifecycle only and replaces `.appSettings` with an empty command group so Cmd-, cannot open a blank window.
   The menu must not advertise Settings until a real preferences UI exists.
-- The menu-bar extra icon is a template SF Symbol (`cloud.moon.fill`).
-  Do not set `isTemplate = false` on the status item.
+- The menu-bar extra shows the app's own icon in color (`MenuBarIcon.brandIcon`), so the status item carries the brand while the app runs.
+  Do not swap it back to a template SF Symbol; that symbol is only the fallback for an unbundled run.
 - The app icon is the Icon Composer document `build/MovingPaper.icon`, compiled into `Assets.car` by `compile_app_icon` in `scripts/lib/icon.sh`.
   Do not set `NSApp.applicationIconImage`: it replaces the system-rendered Liquid Glass icon with a flat image in every alert.
 - The app targets macOS 27 only: add no `#available` check and no fallback for an earlier release.

@@ -9,8 +9,9 @@ The interface is built from system components and system styles; the brand lives
   `scripts/generate-icon-layers.swift` cuts both layers from the flattened art `build/movingpaper-1024.png`; run it only when the art changes.
   The build scripts compile the document with `actool` into the bundle's `Assets.car` ([05-infrastructure.md](05-infrastructure.md)); the app never sets its own icon at run time.
   `build/movingpaper.png` is the same art for the README.
-- The menu-bar extra is the template SF Symbol `cloud.moon.fill`, supplied by `MenuBarIcon`, so it tints with the menu bar; the color PNG never appears in the status item.
-  The symbol keeps its own size (18 by 14 points): it is wider than tall, and a forced square size stretches it.
+- The menu-bar extra is the same icon in color, read from the bundle with `NSImage.applicationIconName` and drawn on a 22-point canvas, so the mark in the menu bar is about as tall as a standard glyph.
+  It is a copy: resizing the shared image in place would shrink the icon in alerts too.
+  An unbundled run (`swift run`, the test runner) has no icon and shows the template SF Symbol `cloud.moon.fill` instead.
 - `scripts/generate-banner.swift` renders `build/banner.png`, and `build/movingpaper-dmg-background.png` with `build/dmg-background-opaque.png` back the DMG window.
 - `build/yen.png` is the YEN credit image the README embeds.
 

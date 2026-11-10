@@ -49,7 +49,7 @@ A video that cannot be loaded or played, and a GIF ImageIO rejects, reach `Wallp
 ## Status item and menu
 
 `StatusBarController` builds the menu from `MenuSnapshot`, so tests cover labels without launching the wallpaper app.
-`MenuBarIcon` supplies the template `cloud.moon.fill` symbol at its own size and `MenuBarLabelFormatter` formats item titles.
+`MenuBarIcon` supplies the app's own icon at menu-bar size and `MenuBarLabelFormatter` formats item titles.
 `OpenAtLogin` manages the login item, and `MovingPaperUpdater` drives Sparkle with every entry point foregrounding the accessory app and returning it to accessory on finish.
 The menu is rebuilt each time it opens, so it reads `canCheckForUpdates` and the download fraction directly; nothing publishes them.
 `MovingPaperApp` keeps a hidden `Settings { EmptyView() }` scene for lifecycle only and replaces `.appSettings` with an empty command group.
