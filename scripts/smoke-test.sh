@@ -96,6 +96,13 @@ verify_release_artifacts() {
     entitlements="$(codesign -dvvv --entitlements :- "$app" 2>&1)"
     grep -q "<key>com.apple.security.app-sandbox</key>" <<< "$entitlements" || fail "Release app entitlements missing app sandbox key"
     grep -q "<false/>" <<< "$entitlements" || fail "Release app sandbox entitlement should be false"
+    # Hardened Runtime gates Photos behind this key, so Shuffle from Photos needs it.
+    if grep -q "<key>com.apple.security.personal-information.photos-library</key>" <<< "$entitlements"; then
+        step "Release app declares the Photos library entitlement"
+    else
+        [ "$REQUIRE_PRODUCTION" = false ] || fail "Release app entitlements missing the Photos library key"
+        warn "Release app was signed before the Photos library entitlement was added"
+    fi
 
     if spctl -a -vv "$app" >/dev/null 2>&1; then
         step "Release app accepted by Gatekeeper"

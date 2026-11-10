@@ -1,27 +1,26 @@
-import Testing
 import AppKit
+import Testing
 @testable import MovingPaper
 
 struct MenuBarIconTests {
 
-    @Test @MainActor func iconRendersWithPositiveSize() {
+    @Test func brandIconIsATemplateSymbol() {
         let icon = MenuBarIcon.brandIcon()
-        #expect(icon.size == MenuBarIcon.pointSize)
+        #expect(icon.isTemplate)
+        #expect(!icon.representations.isEmpty)
+        #expect(icon.accessibilityDescription == "MovingPaper")
     }
 
-    @Test @MainActor func brandIconIsATemplateSymbol() {
+    /// `cloud.moon.fill` is wider than tall. A forced square size stretched it
+    /// in the menu bar, so the icon must keep the symbol's own proportions.
+    @Test func brandIconKeepsTheSymbolProportions() throws {
+        let symbol = try #require(NSImage(systemSymbolName: "cloud.moon.fill", accessibilityDescription: nil))
         let icon = MenuBarIcon.brandIcon()
-        #expect(icon.isTemplate == true)
-        #expect(icon.representations.isEmpty == false)
+        #expect(icon.size == symbol.size)
+        #expect(icon.size.width > icon.size.height)
     }
 
-    @Test @MainActor func iconScalesCorrectly() {
-        let icon = MenuBarIcon.brandIcon()
-        #expect(icon.size.width == 18)
-        #expect(icon.size.height == 18)
-    }
-
-    @Test @MainActor func applicationIconKeepsColourArtwork() {
+    @Test func applicationIconKeepsColourArtwork() {
         let icon = MenuBarIcon.applicationIcon()
         #expect(icon != nil)
         #expect(icon?.isTemplate == false)
