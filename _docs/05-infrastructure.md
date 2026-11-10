@@ -42,7 +42,8 @@ The full re-vendor procedure is owned by dockishOS in [`../../dockishOS/_docs/05
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every push and pull request to `main` on `macos-15`: `swift build` and `swift test --parallel` with a SwiftPM cache.
+`.github/workflows/ci.yml` runs on every push and pull request to `main` on `macos-26`: `swift build` and `swift test --parallel` with a SwiftPM cache.
+The runner cannot be older, because the overlay compiles against the Liquid Glass API in the macOS 26 SDK.
 Signing, notarization, Periphery and the smoke matrix run locally only.
 
 ## Toolchain

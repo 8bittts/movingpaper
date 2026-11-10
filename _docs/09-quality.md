@@ -22,9 +22,10 @@ Mutation-test a new guard by breaking what it protects and watching it fail.
 
 Periphery 3.8.0 (`.periphery.yml`) finds unused code; install the final 3.8.0 binary from its GitHub release because upstream is archived and the Homebrew cask is stale.
 It passes `--build-system native` because Swift 6.4's default build system writes no index store where Periphery looks, and it retains public, `@objc`, protocol-parameter and assign-only declarations on purpose.
-CI compiles with an older toolchain and SDK than a current Mac (Swift 6.1 on the `macos-15` runner), so a construct that only a newer compiler or SDK accepts passes locally and fails there.
+CI's toolchain and SDK (the `macos-26` runner) can trail a current Mac's, so a construct that only a newer compiler or SDK accepts passes locally and fails there.
 
 ## Manual verification
 
+The overlay can be checked without a wallpaper action: show `LoadingOverlayController` from a temporary test, capture that screen region with `screencapture -x -R`, and read the image.
 Use `./scripts/build_and_run.sh --logs` for anything that touches Sparkle, the loading overlay or per-display Space tracking, and confirm the behavior on more than one display when a change touches Spaces.
 Open items that still need a runtime check live in `todos.md`.

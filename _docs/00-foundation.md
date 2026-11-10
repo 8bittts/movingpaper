@@ -11,6 +11,7 @@ Dates are the evidence in this doc; the owner docs carry none.
 - 2026: a source audit of `sources/` (about 3,081 lines) fixes 34 findings and grows the suite from 79 to 101 tests; its record is below.
 - 2026: the HIG menu-bar extra pass (#30 to #43) lands; its deferred follow-ups stay in `todos.md`.
 - 2026-11-10: a second source audit and refactor of `sources/` lands; its record is below.
+- 2026-11-10: the loading overlay moves to Liquid Glass and the interface copy is normalized, closing HIG follow-up #47.
 
 ## Decisions
 
@@ -18,6 +19,7 @@ Dates are the evidence in this doc; the owner docs carry none.
 - **No visible Settings surface** until a real preferences UI exists; `AGENTS.md` carries the rule.
 - **Exact pins for what the app downloads.** yt-dlp is pinned by version and SHA-256 and Sparkle by version, build and binary hash ([04-security.md](04-security.md)).
 - **One doc set for the two macOS apps.** dockishOS owns the Sparkle re-vendor procedure and MovingPaper cites it; MovingPaper's own release path lives in [05-infrastructure.md](05-infrastructure.md) rather than in a root build document or the README.
+- **System surfaces over brand chrome.** The loading overlay was a night-sky brand pill with a shimmer; it is now Liquid Glass with system text styles, and the brand stays in the app icon and the menu-bar mark ([02-design-system.md](02-design-system.md)).
 - **The Homebrew Cask is bumped by hand.** The release script does not touch `Casks/movingpaper.rb`; closing that gap is tracked in `todos.md`.
 
 ## Audit closure (2026)

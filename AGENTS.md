@@ -24,6 +24,9 @@ Status-menu structure lives in `MenuSnapshot`; tests cover labels without launch
   The menu must not advertise Settings until a real preferences UI exists.
 - The menu-bar extra icon is a template SF Symbol (`cloud.moon.fill`).
   Keep the color night-sky PNG for the app icon only; do not set `isTemplate = false` on the status item.
+- The loading overlay's surface is an AppKit `NSGlassEffectView` (`NSVisualEffectView` before macOS 26).
+  Do not replace it with SwiftUI `glassEffect`: in the transparent panel it draws a flat slab ([_docs/02-design-system.md](_docs/02-design-system.md)).
+  CI must run on `macos-26` or newer, because that API is absent from older SDKs.
 - `WallpaperManager` stays the coordinator; extracted helpers each own one seam (routing, persistence, presentation, cache cleanup, power state, request cancellation).
   Do not route wallpaper rendering back through SwiftUI — `WallpaperWindowRouter` hosts video/GIF directly in AppKit.
 - A `WallpaperPersistenceStore` schema change is not done until a test covers the new migration path.

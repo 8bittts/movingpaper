@@ -80,7 +80,7 @@ Everything on your desktop still works normally -- the animation sits underneath
 ## Features
 
 - **Resilient async loading** -- stale YouTube and Photos results are canceled or ignored so your newest wallpaper choice wins
-- **Loading overlay** -- on-brand shimmer pill floats above all windows so you always know what's happening
+- **Loading overlay** -- a Liquid Glass status panel floats above all windows so you always know what's happening
 - **Playback errors** -- missing or unreadable files show an alert instead of a blank desktop
 - **Per-desktop wallpapers** -- different wallpaper on each macOS Space and monitor, including separate Spaces per display
 - **Sound control** -- mute or unmute video audio (muted by default)

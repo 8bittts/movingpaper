@@ -9,7 +9,7 @@ Agent routing lives in `AGENTS.md`; this index follows the fleet documentation s
 | ---------------------- | ----------------------------------------------------------------------------------------------------- |
 | `00-foundation.md`     | History, decisions and the audit closure record                                                       |
 | `01-architecture.md`   | Stack, wallpaper panel, coordinator seams, sources, status item, modes, build pipeline                |
-| `02-design-system.md`  | Marks, the template status-item symbol, overlay style, menu copy                                      |
+| `02-design-system.md`  | Marks, the status-item symbol, overlay surface, menu symbols, typography, text patterns              |
 | `04-security.md`       | Sandbox and permissions, signing and notarization, update-feed trust, yt-dlp supply chain, local data |
 | `05-infrastructure.md` | Scripts, release, distribution, Sparkle vendoring, CI, toolchain                                      |
 | `09-quality.md`        | Gates, test strategy, static analysis, manual verification                                            |

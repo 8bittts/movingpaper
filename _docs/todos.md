@@ -27,5 +27,4 @@ Deferred Apple HIG follow-ups (not this pass):
 - **#44 Dock fallback** — HIG says do not rely on extras; this app is dockless by design (`LSUIElement`, `AGENTS.md`). Revisit only if we add an explicit “Show Dock Icon” command.
 - **#45 Icon Composer app icon** — Flattened pre-rounded `.icns`. Needs Icon Composer layers and appearance variants.
 - **#46 first-run discoverability** — Silent launch. HIG also says do not alert on startup. Needs a non-alert one-time hint, not a launch sheet.
-- **#47 system-material HUD** — Night-sky overlay is brand. Do not restyle it as Liquid Glass in this pass.
 - **#48 String Catalog** — All copy is English. Localize in a dedicated pass.
