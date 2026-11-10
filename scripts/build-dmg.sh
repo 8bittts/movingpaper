@@ -53,6 +53,8 @@ step()  { printf "\033[1;36m  ->\033[0m %s\n" "$1"; }
 
 # shellcheck source=lib/plist.sh
 source "${REPO_ROOT}/scripts/lib/plist.sh"
+# shellcheck source=lib/icon.sh
+source "${REPO_ROOT}/scripts/lib/icon.sh"
 
 resolve_signing_identity() {
     if [ "$UNSIGNED" = true ]; then
@@ -191,18 +193,6 @@ mkdir -p "$BUILD_DIR"
     "${BUILD_DIR}/${APP_NAME}-"*.dmg \
     "${BUILD_DIR}/${APP_NAME}-"*.sha256
 
-info "Generating app icon"
-swift scripts/generate-app-icon.swift
-
-ICONSET_DIR="${BUILD_DIR}/${APP_NAME}.iconset"
-ICNS_FILE="${BUILD_DIR}/${APP_NAME}.icns"
-if [ -d "$ICONSET_DIR" ]; then
-    iconutil -c icns "$ICONSET_DIR" -o "$ICNS_FILE"
-    step "Created ${ICNS_FILE}"
-else
-    warn "Iconset not found — skipping .icns generation"
-fi
-
 info "Building release binary"
 swift build -c release
 step "Build complete"
@@ -233,11 +223,6 @@ if [ -d "$RESOURCE_BUNDLE" ]; then
     step "Copied resource bundle"
 fi
 
-if [ -f "$ICNS_FILE" ]; then
-    cp "$ICNS_FILE" "$RESOURCES_DIR/${APP_NAME}.icns"
-    step "Copied app icon"
-fi
-
 ditto "$SPARKLE_SOURCE" "$FRAMEWORKS_DIR/Sparkle.framework"
 step "Copied Sparkle.framework"
 
@@ -248,7 +233,8 @@ plist_set "$INFO_PLIST" "CFBundleName" string "$APP_NAME"
 plist_set "$INFO_PLIST" "CFBundlePackageType" string "APPL"
 plist_set "$INFO_PLIST" "CFBundleShortVersionString" string "$VERSION"
 plist_set "$INFO_PLIST" "CFBundleVersion" string "$BUILD_NUMBER"
-plist_set "$INFO_PLIST" "CFBundleIconFile" string "$APP_NAME"
+compile_app_icon "${BUILD_DIR}/${APP_NAME}.icon" "$RESOURCES_DIR" "$INFO_PLIST" "$APP_NAME"
+step "Compiled the Liquid Glass app icon"
 plist_set "$INFO_PLIST" "NSPrincipalClass" string "NSApplication"
 # Packaged builds skip Sparkle's permission prompt and opt into stronger
 # archive verification before extraction.

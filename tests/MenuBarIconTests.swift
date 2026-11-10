@@ -19,10 +19,4 @@ struct MenuBarIconTests {
         #expect(icon.size == symbol.size)
         #expect(icon.size.width > icon.size.height)
     }
-
-    @Test func applicationIconKeepsColourArtwork() {
-        let icon = MenuBarIcon.applicationIcon()
-        #expect(icon != nil)
-        #expect(icon?.isTemplate == false)
-    }
 }

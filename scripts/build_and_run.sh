@@ -15,14 +15,15 @@ APP_RESOURCES="${APP_CONTENTS}/Resources"
 APP_FRAMEWORKS="${APP_CONTENTS}/Frameworks"
 APP_BINARY="${APP_MACOS}/${APP_NAME}"
 INFO_PLIST="${APP_CONTENTS}/Info.plist"
-ICONSET_DIR="${REPO_ROOT}/build/${APP_NAME}.iconset"
-ICNS_FILE="${REPO_ROOT}/build/${APP_NAME}.icns"
+ICON_DOCUMENT="${REPO_ROOT}/build/${APP_NAME}.icon"
 SPARKLE_SOURCE="${REPO_ROOT}/tools/sparkle/Sparkle.framework"
 SPARKLE_FEED_URL="${SPARKLE_FEED_URL:-https://github.com/8bittts/movingpaper/releases/latest/download/appcast.xml}"
 SPARKLE_PUBLIC_ED_KEY="${SPARKLE_PUBLIC_ED_KEY:-0Gr0zoQweDjkOPIj9VSnNZzlTSTrnHlHnAIcwaXbmkU=}"
 
 # shellcheck source=lib/plist.sh
 source "${REPO_ROOT}/scripts/lib/plist.sh"
+# shellcheck source=lib/icon.sh
+source "${REPO_ROOT}/scripts/lib/icon.sh"
 
 open_app() {
     /usr/bin/open -n "$APP_BUNDLE"
@@ -41,11 +42,6 @@ RESOURCE_BUNDLE="${BUILD_BIN_DIR}/${APP_NAME}_${APP_NAME}.bundle"
 [ -f "$SOURCE_PLIST" ] || { echo "Missing source Info.plist at ${SOURCE_PLIST}" >&2; exit 1; }
 [ -d "$SPARKLE_SOURCE" ] || { echo "Missing Sparkle.framework at ${SPARKLE_SOURCE}" >&2; exit 1; }
 
-swift scripts/generate-app-icon.swift >/dev/null
-if [ -d "$ICONSET_DIR" ]; then
-    iconutil -c icns "$ICONSET_DIR" -o "$ICNS_FILE"
-fi
-
 LEGACY_LOCAL_BUNDLE="${LOCAL_RUN_DIR}/MovingPaper Dev.app"
 /bin/rm -rf "$LEGACY_LOCAL_BUNDLE"
 /bin/rm -rf "$APP_BUNDLE"
@@ -58,10 +54,6 @@ if [ -d "$RESOURCE_BUNDLE" ]; then
     cp -R "$RESOURCE_BUNDLE" "$APP_RESOURCES/"
 fi
 
-if [ -f "$ICNS_FILE" ]; then
-    cp "$ICNS_FILE" "$APP_RESOURCES/${APP_NAME}.icns"
-fi
-
 ditto "$SPARKLE_SOURCE" "$APP_FRAMEWORKS/Sparkle.framework"
 cp "$SOURCE_PLIST" "$INFO_PLIST"
 
@@ -70,7 +62,7 @@ plist_set "$INFO_PLIST" "CFBundleExecutable" string "$APP_NAME"
 plist_set "$INFO_PLIST" "CFBundleName" string "$APP_NAME"
 plist_set "$INFO_PLIST" "CFBundleDisplayName" string "$APP_NAME"
 plist_set "$INFO_PLIST" "CFBundlePackageType" string "APPL"
-plist_set "$INFO_PLIST" "CFBundleIconFile" string "$APP_NAME"
+compile_app_icon "$ICON_DOCUMENT" "$APP_RESOURCES" "$INFO_PLIST" "$APP_NAME"
 plist_set "$INFO_PLIST" "NSPrincipalClass" string "NSApplication"
 # Local staged app bundles mirror release updater defaults so Sparkle behavior
 # matches distribution builds during manual verification.

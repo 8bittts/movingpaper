@@ -8,7 +8,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppIdentityDefaultsMigration.migrateIfNeeded()
-        installApplicationIcon()
 
         // Menu bar only — no Dock icon, no Cmd+Tab entry
         AppPresentation.returnToAccessory()
@@ -38,10 +37,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         wallpaperManager?.tearDown()
-    }
-
-    private func installApplicationIcon() {
-        guard let icon = MenuBarIcon.applicationIcon() else { return }
-        NSApp.applicationIconImage = icon
     }
 }
