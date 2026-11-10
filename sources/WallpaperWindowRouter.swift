@@ -1,8 +1,5 @@
 import AppKit
-import AVFoundation
-import CoreGraphics
 import CoreMedia
-import Foundation
 
 /// Reconciles per-display `WallpaperWindowController` instances against a plan.
 /// Knows nothing about modes, Spaces, or persistence — the caller hands in a
@@ -57,12 +54,8 @@ final class WallpaperWindowRouter {
     }
 
     private var controllers: [CGDirectDisplayID: WallpaperWindowController] = [:]
-    private(set) var isMuted: Bool = true
+    private var isMuted = true
     var onPlaybackFailure: ((URL, String) -> Void)?
-
-    init(isMuted: Bool = true) {
-        self.isMuted = isMuted
-    }
 
     /// Bring every connected screen in sync with its plan, creating/replacing
     /// controllers where the URL differs and tearing down ones whose screens
@@ -102,9 +95,6 @@ final class WallpaperWindowRouter {
                 if let screen = screensByID[id], let plan = plansByID[id], let existing = controllers[id] {
                     existing.reposition(to: screen)
                     install(plan, in: existing)
-                } else if let screen = screensByID[id], let plan = plansByID[id] {
-                    controllers[id]?.close()
-                    controllers[id] = makeController(screen: screen, plan: plan)
                 }
             }
         }
@@ -126,14 +116,7 @@ final class WallpaperWindowRouter {
     /// Read each live video's current playback time. Caller stores them keyed
     /// by `DesktopKey` according to its mode/space awareness.
     func currentPlaybackTimes() -> [CGDirectDisplayID: CMTime] {
-        var times: [CGDirectDisplayID: CMTime] = [:]
-        for (displayID, controller) in controllers {
-            guard controller.currentURL != nil else { continue }
-            if let time = controller.player?.currentTime(), time.isValid, time.seconds > 0 {
-                times[displayID] = time
-            }
-        }
-        return times
+        controllers.compactMapValues(\.playbackTime)
     }
 
     /// Close every controller and clear the routing table.
@@ -157,16 +140,15 @@ final class WallpaperWindowRouter {
     }
 
     private func install(_ plan: Plan, in controller: WallpaperWindowController) {
-        let frame = controller.panel.contentView?.bounds ?? controller.screen.frame
         switch plan.type {
         case .video:
-            let videoView = VideoPlayerNSView(frame: frame)
+            let videoView = VideoWallpaperView(frame: .zero)
             videoView.onFailure = onPlaybackFailure
-            videoView.setMuted(isMuted)
+            videoView.isMuted = isMuted
             controller.show(videoView, url: plan.url)
             videoView.loadVideo(url: plan.url, resumeTime: plan.resumeTime)
         case .gif:
-            let gifView = GIFAnimationNSView(frame: frame)
+            let gifView = GIFWallpaperView(frame: .zero)
             gifView.onFailure = onPlaybackFailure
             controller.show(gifView, url: plan.url)
             gifView.loadGIF(url: plan.url)

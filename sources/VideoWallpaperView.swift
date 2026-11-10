@@ -1,27 +1,55 @@
 import AVFoundation
 import AppKit
 import Combine
-import CoreMedia
 
 /// AppKit view hosting an `AVPlayerLayer` for hardware-accelerated, seamlessly
 /// looping video wallpapers via `AVQueuePlayer` + `AVPlayerLooper`. Supports
 /// `.mov`, `.mp4`, `.m4v` including HEVC with alpha.
 @MainActor
-final class VideoPlayerNSView: NSView {
-    private(set) var player: AVQueuePlayer?
+final class VideoWallpaperView: NSView, WallpaperContentView {
+    private var player: AVQueuePlayer?
     private var looper: AVPlayerLooper?
     private var statusObserver: AnyCancellable?
     private var looperObserver: AnyCancellable?
     private var endObserver: NSObjectProtocol?
-    private var loadGeneration = 0
-    private var desiredMuted = true
-    private var didHandleReady = false
+    /// The asset load in flight. Internal so tests can await it.
+    private(set) var loadTask: Task<Void, Never>?
+    private var pendingResumeTime: CMTime?
     var onFailure: ((URL, String) -> Void)?
+
+    var isMuted = true {
+        didSet { player?.isMuted = isMuted }
+    }
+
+    /// Kept as state, not only forwarded to the player: a pause that arrives
+    /// while the asset is still loading must hold once the player exists.
+    var isPlaybackPaused = false {
+        didSet {
+            guard isPlaybackPaused != oldValue else { return }
+            if isPlaybackPaused { player?.pause() } else { player?.play() }
+        }
+    }
+
+    /// Current position of the live player, or nil before playback has advanced.
+    var playbackTime: CMTime? {
+        guard let time = player?.currentTime(), time.isValid, time.seconds > 0 else { return nil }
+        return time
+    }
+
+    /// Whether the live player is advancing or about to. Internal for tests.
+    var isPlaying: Bool {
+        player.map { $0.timeControlStatus != .paused } ?? false
+    }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
         layerContentsRedrawPolicy = .never
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError()
     }
 
     /// Apple's recommended presentation: `AVPlayerLayer` as the view's backing
@@ -36,96 +64,82 @@ final class VideoPlayerNSView: NSView {
         layer as! AVPlayerLayer
     }
 
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError()
-    }
-
-    func setMuted(_ muted: Bool) {
-        desiredMuted = muted
-        player?.isMuted = muted
-    }
-
     func loadVideo(url: URL, resumeTime: CMTime? = nil) {
         tearDownPlayback()
-        loadGeneration += 1
-        let token = loadGeneration
-
-        guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else {
-            onFailure?(url, "The wallpaper file is missing.")
-            return
-        }
-
         let asset = AVURLAsset(url: url)
-        Task { @MainActor [weak self] in
-            // AVPlayerLooper needs duration loaded so loop points do not hitch.
-            _ = try? await asset.load(.duration)
-            guard let self, token == self.loadGeneration else { return }
-            self.install(asset: asset, url: url, resumeTime: resumeTime)
+        loadTask = Task { [weak self] in
+            do {
+                // AVPlayerLooper needs duration loaded so loop points do not hitch,
+                // and an unplayable file never fails the player on its own.
+                let (_, isPlayable) = try await asset.load(.duration, .isPlayable)
+                guard !Task.isCancelled else { return }
+                guard isPlayable else {
+                    self?.onFailure?(url, "The video could not be played.")
+                    return
+                }
+                self?.install(asset: asset, url: url, resumeTime: resumeTime)
+            } catch {
+                guard !Task.isCancelled else { return }
+                self?.onFailure?(url, error.localizedDescription)
+            }
         }
     }
 
     private func install(asset: AVURLAsset, url: URL, resumeTime: CMTime?) {
-        let item = AVPlayerItem(asset: asset)
         let queuePlayer = AVQueuePlayer()
-        queuePlayer.isMuted = desiredMuted
+        queuePlayer.isMuted = isMuted
         queuePlayer.preventsDisplaySleepDuringVideoPlayback = false
-        let playerLooper = AVPlayerLooper(player: queuePlayer, templateItem: item)
+        let playerLooper = AVPlayerLooper(player: queuePlayer, templateItem: AVPlayerItem(asset: asset))
 
         playerLayer.player = queuePlayer
         player = queuePlayer
         looper = playerLooper
-        observePlayback(url: url, resumeTime: resumeTime)
-
-        let shouldResume = resumeTime.map { $0.isValid && $0.seconds > 0.1 } ?? false
-        if !shouldResume {
-            queuePlayer.play()
-        }
-    }
-
-    private func observePlayback(url: URL, resumeTime: CMTime?) {
-        guard let queuePlayer = player else { return }
 
         statusObserver = queuePlayer.publisher(for: \.status)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] status in
-                guard let self else { return }
                 switch status {
                 case .readyToPlay:
-                    self.handleReady(resumeTime)
+                    self?.seekToPendingResumeTime()
                 case .failed:
                     let message = queuePlayer.error?.localizedDescription ?? "The video could not be played."
-                    self.onFailure?(url, message)
+                    self?.onFailure?(url, message)
                 default:
                     break
                 }
             }
-
-        looperObserver = looper?.publisher(for: \.status)
+        looperObserver = playerLooper.publisher(for: \.status)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] status in
                 if status == .failed {
                     self?.enableRewindFallback()
                 }
             }
+
+        if let resumeTime, resumeTime.isValid, resumeTime.seconds > 0.1 {
+            // Playback starts once the ready player has seeked there.
+            pendingResumeTime = resumeTime
+        } else {
+            playIfNotPaused()
+        }
     }
 
-    private func handleReady(_ resumeTime: CMTime?) {
-        guard !didHandleReady else { return }
-        didHandleReady = true
-        guard let queuePlayer = player,
-              let resumeTime,
-              resumeTime.isValid,
-              resumeTime.seconds > 0.1
-        else { return }
+    private func seekToPendingResumeTime() {
+        guard let resumeTime = pendingResumeTime else { return }
+        pendingResumeTime = nil
         // Tight-but-not-zero tolerance avoids a decode hitch at resume.
         let slip = CMTime(seconds: 0.05, preferredTimescale: 600)
-        queuePlayer.seek(to: resumeTime, toleranceBefore: slip, toleranceAfter: slip) { [weak self] finished in
+        player?.seek(to: resumeTime, toleranceBefore: slip, toleranceAfter: slip) { [weak self] finished in
             Task { @MainActor in
                 guard finished else { return }
-                self?.player?.play()
+                self?.playIfNotPaused()
             }
         }
+    }
+
+    private func playIfNotPaused() {
+        guard !isPlaybackPaused else { return }
+        player?.play()
     }
 
     private func enableRewindFallback() {
@@ -140,12 +154,15 @@ final class VideoPlayerNSView: NSView {
             MainActor.assumeIsolated {
                 guard let self, let ending, self.player?.currentItem === ending else { return }
                 self.player?.seek(to: .zero)
-                self.player?.play()
+                self.playIfNotPaused()
             }
         }
     }
 
     private func tearDownPlayback() {
+        loadTask?.cancel()
+        loadTask = nil
+        pendingResumeTime = nil
         statusObserver = nil
         looperObserver = nil
         if let endObserver {
@@ -156,17 +173,10 @@ final class VideoPlayerNSView: NSView {
         looper = nil
         player = nil
         playerLayer.player = nil
-        didHandleReady = false
     }
 
     override func removeFromSuperview() {
         tearDownPlayback()
         super.removeFromSuperview()
-    }
-}
-
-extension VideoPlayerNSView: OcclusionPausable {
-    func setOcclusionHidden(_ hidden: Bool) {
-        if hidden { player?.pause() } else { player?.play() }
     }
 }
