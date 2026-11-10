@@ -4,18 +4,18 @@ Build scripts, release pipeline, distribution channels, Sparkle vendoring and CI
 
 ## Scripts
 
-| Command                                 | Behavior                                                                                      |
-| --------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `./scripts/build_and_run.sh`            | Stage a real `.app` under `build/local-run/` and launch it; the only path where Sparkle is live |
-| `./scripts/build_and_run.sh --logs`     | Launch and stream the app's unified logs                                                      |
-| `./scripts/smoke-test.sh`               | Tests, release build, staged bundle and bundle-shape checks without launching the wallpaper   |
-| `./scripts/smoke-test.sh --production`  | Also require and verify the signed app, notarized DMG, checksum and signed appcast            |
-| `./scripts/build-dmg.sh --build-only`   | Assemble the release app bundle only                                                          |
-| `./scripts/build-dmg.sh --local`        | Build, sign and package the DMG, skipping notarization                                        |
-| `./scripts/build-dmg.sh --unsigned`     | Ad-hoc sign without a Developer ID                                                            |
-| `./scripts/build-dmg.sh`                | Signed and notarized release DMG                                                              |
-| `./scripts/release-movingpaper.sh`      | Bump the version, package, notarize, tag and publish the GitHub release                       |
-| `./scripts/generate-appcast.sh`         | Regenerate and re-sign the Sparkle appcast                                                    |
+| Command                                | Behavior                                                                                                         |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `./scripts/build_and_run.sh`           | Stage a real `.app` under `build/local-run/` and launch it; the only path where Sparkle is live                  |
+| `./scripts/build_and_run.sh --logs`    | Launch and stream the app's unified logs                                                                         |
+| `./scripts/smoke-test.sh`              | Tests, release build, staged bundle and bundle-shape checks without launching the wallpaper                      |
+| `./scripts/smoke-test.sh --production` | Also require and verify the signed app, notarized DMG, checksum and signed appcast                               |
+| `./scripts/build-dmg.sh --build-only`  | Assemble the release app bundle only                                                                             |
+| `./scripts/build-dmg.sh --local`       | Build, sign and package the DMG, skipping notarization                                                           |
+| `./scripts/build-dmg.sh --unsigned`    | Ad-hoc sign without a Developer ID                                                                               |
+| `./scripts/build-dmg.sh`               | Signed and notarized release DMG; stops before the build without the Developer ID identity or the notary profile |
+| `./scripts/release-movingpaper.sh`     | Bump the version, package, notarize, tag and publish the GitHub release                                          |
+| `./scripts/generate-appcast.sh`        | Regenerate and re-sign the Sparkle appcast                                                                       |
 
 `scripts/lib/plist.sh` holds the shared plist helpers and `scripts/lib/icon.sh` the app-icon step: `compile_app_icon` runs `actool` on `build/MovingPaper.icon`, writes `Assets.car` and the flattened `.icns` into the bundle, sets `CFBundleIconName` and `CFBundleIconFile`, and fails the build when any of them is missing.
 `scripts/generate-icon-layers.swift` and `scripts/generate-banner.swift` produce the brand assets ([02-design-system.md](02-design-system.md)).

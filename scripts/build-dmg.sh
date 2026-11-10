@@ -3,7 +3,7 @@
 # build-dmg.sh — Build, sign, and package MovingPaper.app as a DMG.
 #
 # Usage:
-#   ./scripts/build-dmg.sh                  # Build current metadata into a signed DMG
+#   ./scripts/build-dmg.sh                  # Full release: signed + notarized DMG; fails without the credentials
 #   ./scripts/build-dmg.sh --build-only     # Build and assemble .app only (no DMG)
 #   ./scripts/build-dmg.sh --local          # Build + DMG, skip notarization
 #   ./scripts/build-dmg.sh --unsigned       # Ad-hoc sign only (no Developer ID)
@@ -29,6 +29,7 @@ DMG_VOLUME_NAME="MovingPaper"
 DMG_ICON_SIZE=128
 NOTARY_PROFILE="${MOVINGPAPER_NOTARY_PROFILE:-YEN-Notarization}"
 SOURCE_PLIST="sources/Resources/Info.plist"
+ENTITLEMENTS="MovingPaper.entitlements"
 SPARKLE_SOURCE="tools/sparkle/Sparkle.framework"
 SPARKLE_FEED_URL="${SPARKLE_FEED_URL:-https://github.com/${GITHUB_REPO}/releases/latest/download/appcast.xml}"
 SPARKLE_PUBLIC_ED_KEY="${SPARKLE_PUBLIC_ED_KEY:-0Gr0zoQweDjkOPIj9VSnNZzlTSTrnHlHnAIcwaXbmkU=}"
@@ -98,7 +99,8 @@ sign_target() {
 
     local args=("${CODESIGN_ARGS[@]}")
     if [ "$with_entitlements" = true ]; then
-        args+=(--entitlements "MovingPaper.entitlements")
+        [ -f "$ENTITLEMENTS" ] || fail "Entitlements file missing: ${ENTITLEMENTS}"
+        args+=(--entitlements "$ENTITLEMENTS")
     fi
 
     codesign "${args[@]}" "$target"
@@ -118,6 +120,20 @@ sign_with_retry() {
         sleep 2
     done
     fail "Signing failed after $max_attempts attempts"
+}
+
+# The default mode is the release mode, so it fails closed before the build:
+# an ad-hoc signature or a skipped notarization is a choice (--unsigned,
+# --local), never a fallback.
+require_release_credentials() {
+    if [ "$BUILD_ONLY" = true ] || [ "$LOCAL_MODE" = true ] || [ "$UNSIGNED" = true ]; then
+        return 0
+    fi
+    [ "$CODESIGN_IDENTITY" != "-" ] \
+        || fail "No Developer ID Application identity found. Pass --unsigned for an ad-hoc build."
+    xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1 \
+        || fail "Notary profile '${NOTARY_PROFILE}' is unavailable. Pass --local to skip notarization, or run: xcrun notarytool store-credentials ${NOTARY_PROFILE}"
+    step "Release credentials verified"
 }
 
 json_value() {
@@ -182,6 +198,7 @@ info "Packaging MovingPaper v${VERSION} (build ${BUILD_NUMBER})"
 
 resolve_signing_identity
 codesign_base_args
+require_release_credentials
 
 info "Cleaning previous artifacts"
 mkdir -p "$BUILD_DIR"
@@ -218,10 +235,9 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$FRAMEWORKS_DIR"
 cp "$BINARY_PATH" "$MACOS_DIR/${APP_NAME}"
 step "Copied binary"
 
-if [ -d "$RESOURCE_BUNDLE" ]; then
-    cp -R "$RESOURCE_BUNDLE" "$RESOURCES_DIR/"
-    step "Copied resource bundle"
-fi
+[ -d "$RESOURCE_BUNDLE" ] || fail "Resource bundle not found at ${RESOURCE_BUNDLE}"
+cp -R "$RESOURCE_BUNDLE" "$RESOURCES_DIR/"
+step "Copied resource bundle"
 
 ditto "$SPARKLE_SOURCE" "$FRAMEWORKS_DIR/Sparkle.framework"
 step "Copied Sparkle.framework"
@@ -432,8 +448,7 @@ else
     elif [ "$UNSIGNED" = true ]; then
         step "Skipping notarization (--unsigned)"
     else
-        warn "Notarization skipped — no keychain profile '${NOTARY_PROFILE}' found"
-        warn "To set up: xcrun notarytool store-credentials ${NOTARY_PROFILE}"
+        fail "Notarization did not run in the release mode"
     fi
 fi
 
@@ -443,13 +458,10 @@ echo "${CHECKSUM}  $(basename "$DMG_FINAL")" > "${BUILD_DIR}/${APP_NAME}-${VERSI
 step "SHA-256: ${CHECKSUM}"
 
 APPCAST_SCRIPT="$(dirname "$0")/generate-appcast.sh"
-if [ -f "$APPCAST_SCRIPT" ]; then
-    info "Generating appcast"
-    bash "$APPCAST_SCRIPT"
-    step "Appcast generated: ${BUILD_DIR}/appcast.xml"
-else
-    warn "Appcast script not found at ${APPCAST_SCRIPT}"
-fi
+[ -f "$APPCAST_SCRIPT" ] || fail "Appcast script missing at ${APPCAST_SCRIPT}"
+info "Generating appcast"
+bash "$APPCAST_SCRIPT"
+step "Appcast generated: ${BUILD_DIR}/appcast.xml"
 
 DOWNLOAD_URL="https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}/$(basename "$DMG_FINAL")"
 DMG_SIZE="$(du -h "$DMG_FINAL" | awk '{print $1}')"
