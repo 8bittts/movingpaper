@@ -6,7 +6,7 @@ Gates, test strategy, static analysis and verification rules for MovingPaper.
 
 `swift test` runs the unit suite in `tests/`, and `./scripts/smoke-test.sh` is the pre-ship gate: it runs the tests, builds release, assembles a staged app bundle and verifies the bundle shape without launching the wallpaper.
 `./scripts/smoke-test.sh --production` also requires and verifies the signed release app, the signed and notarized DMG, the checksum and the signed Sparkle appcast, and the release flow runs it as its production gate.
-CI runs only `swift build` and `swift test --parallel` ([05-infrastructure.md](05-infrastructure.md)).
+CI only compiles the app and its tests; it cannot run them until a hosted runner runs macOS 27 ([05-infrastructure.md](05-infrastructure.md)).
 
 ## Test strategy
 
@@ -22,7 +22,8 @@ Mutation-test a new guard by breaking what it protects and watching it fail.
 
 Periphery 3.8.0 (`.periphery.yml`) finds unused code; install the final 3.8.0 binary from its GitHub release because upstream is archived and the Homebrew cask is stale.
 It passes `--build-system native` because Swift 6.4's default build system writes no index store where Periphery looks, and it retains public, `@objc`, protocol-parameter and assign-only declarations on purpose.
-CI's toolchain and SDK (the `macos-26` runner) can trail a current Mac's, so a construct that only a newer compiler or SDK accepts passes locally and fails there.
+CI's toolchain and SDK (the `macos-26` runner) trail a macOS 27 Mac's, so a construct that only the newer compiler or SDK accepts passes locally and fails there.
+Build with `-Xswiftc -warnings-as-errors` after raising the deployment target: each raise turns newly deprecated calls into warnings.
 
 ## Manual verification
 

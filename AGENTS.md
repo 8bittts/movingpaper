@@ -23,10 +23,14 @@ Status-menu structure lives in `MenuSnapshot`; tests cover labels without launch
   `MovingPaperApp` keeps a hidden `Settings { EmptyView() }` scene for lifecycle only and replaces `.appSettings` with an empty command group so Cmd-, cannot open a blank window.
   The menu must not advertise Settings until a real preferences UI exists.
 - The menu-bar extra icon is a template SF Symbol (`cloud.moon.fill`).
-  Keep the color night-sky PNG for the app icon only; do not set `isTemplate = false` on the status item.
-- The loading overlay's surface is an AppKit `NSGlassEffectView` (`NSVisualEffectView` before macOS 26).
+  Do not set `isTemplate = false` on the status item.
+- The app icon is the Icon Composer document `build/MovingPaper.icon`, compiled into `Assets.car` by `compile_app_icon` in `scripts/lib/icon.sh`.
+  Do not set `NSApp.applicationIconImage`: it replaces the system-rendered Liquid Glass icon with a flat image in every alert.
+- The app targets macOS 27 only: add no `#available` check and no fallback for an earlier release.
+  Change `platforms` in `Package.swift` and `LSMinimumSystemVersion` in `sources/Resources/Info.plist` together; the appcast takes its `sparkle:minimumSystemVersion` from the plist, and that value is what keeps Sparkle from offering the build to an older Mac.
+- The loading overlay's surface is an AppKit `NSGlassEffectView`.
   Do not replace it with SwiftUI `glassEffect`: in the transparent panel it draws a flat slab ([_docs/02-design-system.md](_docs/02-design-system.md)).
-  CI must run on `macos-26` or newer, because that API is absent from older SDKs.
+- CI compiles only. No hosted runner runs macOS 27, so `./scripts/smoke-test.sh` is the test gate; do not read a green CI run as passing tests.
 - `WallpaperManager` stays the coordinator; extracted helpers each own one seam (routing, persistence, presentation, cache cleanup, power state, request cancellation).
   Do not route wallpaper rendering back through SwiftUI — `WallpaperWindowRouter` hosts video/GIF directly in AppKit.
 - A `WallpaperPersistenceStore` schema change is not done until a test covers the new migration path.

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <!-- version-badge -->v0.044<!-- /version-badge --> · macOS 15+ · Apple Silicon · Swift 6 · MIT · <a href="https://x.com/8BIT/status/2043384259482902603">Short Demo</a>
+  <!-- version-badge -->v0.044<!-- /version-badge --> · macOS 27+ · Apple Silicon · Swift 6 · MIT · <a href="https://x.com/8BIT/status/2043384259482902603">Short Demo</a>
 </p>
 
 ---
@@ -46,6 +46,8 @@ Open the `.dmg`, drag **MovingPaper** to Applications, launch it.
 Look for the moon icon in your menu bar -- that's it.
 
 > Apple Silicon (arm64). Code-signed with Developer ID and notarized by Apple. Auto-updates via Sparkle.
+>
+> MovingPaper requires macOS 27 from the release after v0.044. v0.044 is the last release for macOS 15 through 26, and Sparkle does not offer a newer one to those Macs.
 
 ### Homebrew
 
@@ -80,6 +82,7 @@ Everything on your desktop still works normally -- the animation sits underneath
 ## Features
 
 - **Resilient async loading** -- stale YouTube and Photos results are canceled or ignored so your newest wallpaper choice wins
+- **Native macOS 27 design** -- system menus with SF Symbols, system alerts and system typography throughout; nothing is custom-drawn
 - **Loading overlay** -- a Liquid Glass status panel floats above all windows so you always know what's happening
 - **Playback errors** -- missing or unreadable files show an alert instead of a blank desktop
 - **Per-desktop wallpapers** -- different wallpaper on each macOS Space and monitor, including separate Spaces per display
@@ -113,7 +116,7 @@ In **Per Desktop** mode, each Space and monitor gets its own wallpaper -- switch
 
 ## Build from Source
 
-Requires macOS 15.0+ and Swift 6.0+.
+Requires macOS 27 and Xcode 27.
 
 ```bash
 git clone https://github.com/8bittts/movingpaper.git

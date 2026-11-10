@@ -4,7 +4,8 @@ Runtime shape, code layout and data flow of MovingPaper; the rules that constrai
 
 ## Stack
 
-A SwiftPM macOS menu-bar app for macOS 15 and later on Apple Silicon, written in Swift 6.
+A SwiftPM macOS menu-bar app for macOS 27 and later on Apple Silicon, written in Swift 6.
+The deployment target is the current system on purpose: the code carries no availability checks and no fallbacks for earlier releases.
 AppKit owns the wallpaper views, the status item and the loading overlay's surface; SwiftUI owns only the app lifecycle and the overlay's content ([02-design-system.md](02-design-system.md)).
 AVFoundation plays video (`AVQueuePlayer`, `AVPlayerLooper`, `AVPlayerLayer`), ImageIO animates GIFs (`CGAnimateImageAtURLWithBlock`), PhotosUI and PhotoKit supply the Photos picker and shuffle, and private CoreGraphics APIs (`CGSCopyManagedDisplaySpaces`, `CGSGetActiveSpace`) track Spaces.
 Sparkle 2.10.1 is vendored for updates; distribution is a notarized DMG and a Homebrew Cask ([05-infrastructure.md](05-infrastructure.md)).

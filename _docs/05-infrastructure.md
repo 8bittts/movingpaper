@@ -17,7 +17,8 @@ Build scripts, release pipeline, distribution channels, Sparkle vendoring and CI
 | `./scripts/release-movingpaper.sh`      | Bump the version, package, notarize, tag and publish the GitHub release                       |
 | `./scripts/generate-appcast.sh`         | Regenerate and re-sign the Sparkle appcast                                                    |
 
-`scripts/lib/plist.sh` holds the shared plist helpers, and `scripts/generate-app-icon.swift` and `scripts/generate-banner.swift` produce the brand assets ([02-design-system.md](02-design-system.md)).
+`scripts/lib/plist.sh` holds the shared plist helpers and `scripts/lib/icon.sh` the app-icon step: `compile_app_icon` runs `actool` on `build/MovingPaper.icon`, writes `Assets.car` and the flattened `.icns` into the bundle, sets `CFBundleIconName` and `CFBundleIconFile`, and fails the build when any of them is missing.
+`scripts/generate-icon-layers.swift` and `scripts/generate-banner.swift` produce the brand assets ([02-design-system.md](02-design-system.md)).
 `swift run MovingPaper` is fine for general code paths, but Sparkle stays dormant there.
 
 ## Release
@@ -33,6 +34,10 @@ Notarization uses the keychain profile `YEN-Notarization` unless `MOVINGPAPER_NO
 - Homebrew: the repository doubles as a tap; `brew install --cask` works from the raw Cask URL or after `brew tap 8bittts/movingpaper`.
 - In-app: Sparkle checks hourly from the EdDSA-signed feed.
 
+The app requires macOS 27 (`LSMinimumSystemVersion` in `sources/Resources/Info.plist`, mirrored by `platforms` in `Package.swift`).
+`generate_appcast` copies that value into the feed as `sparkle:minimumSystemVersion`, which is what stops Sparkle from offering the update to an older Mac; `./scripts/smoke-test.sh` fails when the feed and the bundle disagree.
+v0.044 is the last release for macOS 15 through 26.
+
 ## Sparkle vendoring
 
 The vendored framework lives at `tools/sparkle/Sparkle.framework` and is pinned in `tools/sparkle/VERSION` to version 2.10.1, build 2065, with the main binary's SHA-256 and the required helper paths.
@@ -42,8 +47,9 @@ The full re-vendor procedure is owned by dockishOS in [`../../dockishOS/_docs/05
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every push and pull request to `main` on `macos-26`: `swift build` and `swift test --parallel` with a SwiftPM cache.
-The runner cannot be older, because the overlay compiles against the Liquid Glass API in the macOS 26 SDK.
+`.github/workflows/ci.yml` runs on every push and pull request to `main` on `macos-26`: `swift build --build-tests` with a SwiftPM cache.
+It compiles the app and its tests but does not run them: the app requires macOS 27 and no hosted runner runs it yet, so a test binary cannot launch there.
+The test gate is `./scripts/smoke-test.sh` on a macOS 27 Mac; restoring `swift test` in CI is tracked in `todos.md`.
 Signing, notarization, Periphery and the smoke matrix run locally only.
 
 ## Toolchain
