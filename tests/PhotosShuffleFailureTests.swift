@@ -2,31 +2,24 @@ import Foundation
 import Testing
 @testable import MovingPaper
 
-struct PhotosShuffleOutcomeTests {
+struct PhotosShuffleFailureTests {
 
     @Test func accessDeniedExplainsSettings() {
-        let outcome = PhotosShuffleOutcome.accessDenied
-        #expect(outcome.alertTitle == "Photos Access Needed")
-        #expect(outcome.alertMessage?.contains("System Settings") == true)
+        let failure = PhotosShuffleFailure.accessDenied
+        #expect(failure.alertTitle == "Photos Access Needed")
+        #expect(failure.alertMessage.contains("System Settings"))
     }
 
     @Test func emptyLibraryDoesNotAskForPermission() {
-        let outcome = PhotosShuffleOutcome.noVideos
-        #expect(outcome.alertTitle == "No Videos Found")
-        #expect(outcome.alertMessage?.contains("Photos library") == true)
-        #expect(outcome.alertMessage?.contains("System Settings") != true)
+        let failure = PhotosShuffleFailure.noVideos
+        #expect(failure.alertTitle == "No Videos Found")
+        #expect(failure.alertMessage.contains("Photos library"))
+        #expect(!failure.alertMessage.contains("System Settings"))
     }
 
     @Test func exportFailurePointsAtChooseFromPhotos() {
-        let outcome = PhotosShuffleOutcome.exportFailed
-        #expect(outcome.alertTitle == "Couldn't Shuffle")
-        #expect(outcome.alertMessage?.contains("Choose from Photos") == true)
-    }
-
-    @Test func successHasNoAlert() {
-        let url = URL(fileURLWithPath: "/tmp/clip.mp4")
-        let outcome = PhotosShuffleOutcome.video(url)
-        #expect(outcome.alertTitle == nil)
-        #expect(outcome.alertMessage == nil)
+        let failure = PhotosShuffleFailure.exportFailed
+        #expect(failure.alertTitle == "Couldn't Shuffle")
+        #expect(failure.alertMessage.contains("Choose from Photos"))
     }
 }

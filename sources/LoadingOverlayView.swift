@@ -1,5 +1,4 @@
 import AppKit
-import QuartzCore
 import SwiftUI
 
 // MARK: - Brand Palette (night sky)
@@ -53,7 +52,7 @@ struct LoadingOverlayView: View {
     private var shimmerText: some View {
         Text(message)
             .font(.system(.body, design: .rounded).weight(.semibold))
-            .foregroundColor(reduceMotion ? Brand.textBright : Brand.textDim)
+            .foregroundStyle(reduceMotion ? Brand.textBright : Brand.textDim)
             .overlay {
                 if !reduceMotion {
                     sheen.mask(textMask)
@@ -105,7 +104,7 @@ struct LoadingOverlayView: View {
 @MainActor
 final class LoadingOverlayController {
     private var panel: NSPanel?
-    private var hostingView: NSHostingView<AnyView>?
+    private var hostingView: NSHostingView<LoadingOverlayView>?
     /// The display to center on (nil → main screen, for all-desktops changes).
     private var targetScreen: NSScreen?
     /// Last VoiceOver key so percent ticks do not re-announce.
@@ -115,21 +114,17 @@ final class LoadingOverlayController {
         targetScreen = screen
         let content = LoadingOverlayView(message: message, progress: progress)
 
+        announceIfNeeded(message)
+
         if let hostingView {
-            hostingView.rootView = AnyView(content)
+            hostingView.rootView = content
             resizePanel()
-            announceIfNeeded(message)
             return
         }
 
-        announceIfNeeded(message)
-
-        let hosting = NSHostingView(rootView: AnyView(content))
-        let size = hosting.fittingSize
-        let fixedWidth = max(size.width, 220)
-
+        let hosting = NSHostingView(rootView: content)
         let window = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: fixedWidth, height: size.height),
+            contentRect: NSRect(origin: .zero, size: Self.panelSize(fitting: hosting)),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -142,9 +137,7 @@ final class LoadingOverlayController {
         window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
 
-        hosting.frame = window.contentView!.bounds
-        hosting.autoresizingMask = [.width, .height]
-        window.contentView?.addSubview(hosting)
+        window.contentView = hosting
 
         centerOnScreen(window)
 
@@ -215,10 +208,15 @@ final class LoadingOverlayController {
 
     private func resizePanel() {
         guard let panel, let hostingView else { return }
-        let size = hostingView.fittingSize
-        let fixedWidth = max(size.width, 220)
-        panel.setContentSize(NSSize(width: fixedWidth, height: size.height))
+        panel.setContentSize(Self.panelSize(fitting: hostingView))
         centerOnScreen(panel)
+    }
+
+    /// The pill's fitting size, never narrower than the progress bar needs, so
+    /// the panel does not jitter as the percentage text changes width.
+    private static func panelSize(fitting hostingView: NSHostingView<LoadingOverlayView>) -> NSSize {
+        let size = hostingView.fittingSize
+        return NSSize(width: max(size.width, 220), height: size.height)
     }
 
     private func centerOnScreen(_ window: NSPanel) {

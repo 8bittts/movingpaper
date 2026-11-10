@@ -231,7 +231,7 @@ final class YouTubeDownloader {
                 guard !chunk.isEmpty,
                       let fraction = Self.progressFraction(in: String(decoding: chunk, as: UTF8.self))
                 else { return }
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
                     guard let self, self.activeDownloadID == downloadID else { return }
                     self.progress = fraction
                 }
@@ -245,7 +245,7 @@ final class YouTubeDownloader {
                 try? errorPipe.fileHandleForReading.close()
                 let status = process.terminationStatus
 
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
                     guard let self else {
                         continuation.resume(returning: .cancelled)
                         return

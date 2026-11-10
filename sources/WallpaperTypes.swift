@@ -12,6 +12,11 @@ struct DesktopKey: Hashable {
     let displayID: CGDirectDisplayID
     let spaceID: UInt64
 
+    /// Whether this is a display's all-desktops slot. Space ID 0 is that
+    /// sentinel, never a real Space.
+    var isAllDesktops: Bool { spaceID == 0 }
+
+    /// The all-desktops slot of a display.
     init(displayID: CGDirectDisplayID) {
         self.displayID = displayID
         self.spaceID = 0

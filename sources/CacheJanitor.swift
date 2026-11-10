@@ -50,11 +50,7 @@ enum CacheJanitor {
         let totalSize = candidates.reduce(Int64(0)) { $0 + $1.size }
         guard totalSize > budgetBytes else { return 0 }
 
-        // Resolve symlinks so protection matches regardless of how the path was
-        // spelled (e.g. /var vs /private/var).
-        let protectedResolved = Set(protectedPaths.map {
-            URL(filePath: $0).resolvingSymlinksInPath().path(percentEncoded: false)
-        })
+        let protectedResolved = Set(protectedPaths.map { resolvedPath(URL(filePath: $0)) })
 
         // Oldest first — those are the most likely to be unused.
         let sorted = candidates.sorted { $0.modified < $1.modified }
@@ -64,7 +60,7 @@ enum CacheJanitor {
         for candidate in sorted where remaining > budgetBytes {
             // Never evict a file that is currently referenced by a live wallpaper —
             // dropping it would blank the desktop until the next launch redownload.
-            if protectedResolved.contains(candidate.url.resolvingSymlinksInPath().path(percentEncoded: false)) { continue }
+            if protectedResolved.contains(resolvedPath(candidate.url)) { continue }
             do {
                 try fileManager.removeItem(at: candidate.url)
                 remaining -= candidate.size
@@ -108,17 +104,19 @@ enum CacheJanitor {
             return 0
         }
 
-        let referencedResolved = Set(referencedPaths.map {
-            URL(filePath: $0).resolvingSymlinksInPath().path(percentEncoded: false)
-        })
+        let referencedResolved = Set(referencedPaths.map { resolvedPath(URL(filePath: $0)) })
 
         var deleted = 0
-        for url in entries {
-            let path = url.resolvingSymlinksInPath().path(percentEncoded: false)
-            if referencedResolved.contains(path) { continue }
+        for url in entries where !referencedResolved.contains(resolvedPath(url)) {
             if (try? fileManager.removeItem(at: url)) != nil { deleted += 1 }
         }
         return deleted
+    }
+
+    /// Resolve symlinks so two spellings of one file compare equal
+    /// (e.g. /var vs /private/var).
+    private static func resolvedPath(_ url: URL) -> String {
+        url.resolvingSymlinksInPath().path(percentEncoded: false)
     }
 
     /// Prune orphaned Photos picker/shuffle cache files not referenced by a live

@@ -1,5 +1,4 @@
 import AppKit
-import CoreGraphics
 
 /// Borderless panel that sits at the desktop level, behind icons but above the wallpaper.
 /// Invisible to mouse events so Finder desktop icons remain fully interactive.

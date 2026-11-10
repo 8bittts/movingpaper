@@ -6,29 +6,21 @@ import AppKit
 /// download-progress updates.
 @MainActor
 final class StatusBarController: NSObject {
-    private var statusItem: NSStatusItem?
+    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let wallpaperManager: WallpaperManager
     private let updater: MovingPaperUpdater
+    private var isPickingFromPhotos = false
 
     init(wallpaperManager: WallpaperManager, updater: MovingPaperUpdater) {
         self.wallpaperManager = wallpaperManager
         self.updater = updater
         super.init()
 
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        if let button = item.button {
-            let icon = MenuBarIcon.brandIcon()
-            icon.accessibilityDescription = "MovingPaper"
-            button.image = icon
-            button.toolTip = "MovingPaper"
-        }
-        let menu = NSMenu()
-        // Manage enabled state ourselves; otherwise AppKit auto-enables any item
-        // with a valid target/action, overriding e.g. the Check-for-Updates gate.
-        menu.autoenablesItems = false
+        statusItem.button?.image = MenuBarIcon.brandIcon()
+        statusItem.button?.toolTip = "MovingPaper"
+        let menu = makeMenu([])
         menu.delegate = self
-        item.menu = menu
-        self.statusItem = item
+        statusItem.menu = menu
     }
 
     private func rebuildMenu(into menu: NSMenu) {
@@ -60,20 +52,18 @@ final class StatusBarController: NSObject {
             return NSMenuItem.sectionHeader(title: title)
         case .command(let command):
             return makeCommandItem(command)
-        case .submenu(let title, let rows):
-            let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-            item.submenu = makeSubmenu(rows)
-            return item
-        case .item(let title, let checked, let children):
+        case .submenu(let title, let checked, let rows):
             let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
             item.state = checked ? .on : .off
-            item.submenu = makeSubmenu(children)
+            item.submenu = makeMenu(rows)
             return item
         }
     }
 
-    private func makeSubmenu(_ rows: [MenuRow]) -> NSMenu {
+    private func makeMenu(_ rows: [MenuRow]) -> NSMenu {
         let menu = NSMenu()
+        // Manage enabled state ourselves; otherwise AppKit auto-enables any item
+        // with a valid target/action, overriding e.g. the Check-for-Updates gate.
         menu.autoenablesItems = false
         append(rows, to: menu)
         return menu
@@ -150,8 +140,7 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func pasteYouTube(_ sender: NSMenuItem) {
-        let urlString = promptForYouTubeURL()
-        guard let urlString else { return }
+        guard let urlString = promptForYouTubeURL() else { return }
         wallpaperManager.setYouTubeWallpaper(urlString: urlString, for: optionalDisplayID(sender))
     }
 
@@ -175,7 +164,11 @@ final class StatusBarController: NSObject {
             input.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
             input.lineBreakMode = .byTruncatingMiddle
             input.usesSingleLineMode = true
-            if let clip = NSPasteboard.general.string(forType: .string) {
+            // Prefill only a YouTube URL: any other clipboard text is not what
+            // this field is for and may be something private.
+            if let clip = NSPasteboard.general.string(forType: .string)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+               YouTubeURLParser.isYouTubeURL(clip) {
                 input.stringValue = clip
             }
             alert.accessoryView = input
@@ -192,13 +185,17 @@ final class StatusBarController: NSObject {
     }
 
     /// Foreground the app, run the Photos picker, and assign the pick (nil display = all).
+    /// One picker at a time: a second request while one is open does nothing.
     private func presentPhotosPicker(for displayID: CGDirectDisplayID?) {
+        guard !isPickingFromPhotos else { return }
+        isPickingFromPhotos = true
         AppPresentation.promoteToForeground()
         Task {
-            defer { AppPresentation.returnToAccessory() }
-            let picker = PhotosPickerController()
-            let url = await picker.run()
-            guard let url else { return }
+            defer {
+                isPickingFromPhotos = false
+                AppPresentation.returnToAccessory()
+            }
+            guard let url = await PhotosPickerController().run() else { return }
             wallpaperManager.setWallpaper(url: url, for: displayID)
         }
     }

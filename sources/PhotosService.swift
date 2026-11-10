@@ -1,25 +1,23 @@
 import AVFoundation
 import Photos
+import os
 
-/// Result of a Photos shuffle so the UI can explain access-denied vs empty vs export failure.
-enum PhotosShuffleOutcome: Equatable {
-    case video(URL)
+/// Why a Photos shuffle produced no video, with the alert copy that explains it.
+enum PhotosShuffleFailure: Equatable {
     case accessDenied
     case noVideos
     case exportFailed
 
-    var alertTitle: String? {
+    var alertTitle: String {
         switch self {
-        case .video: nil
         case .accessDenied: "Photos Access Needed"
         case .noVideos: "No Videos Found"
         case .exportFailed: "Couldn't Shuffle"
         }
     }
 
-    var alertMessage: String? {
+    var alertMessage: String {
         switch self {
-        case .video: nil
         case .accessDenied:
             "Allow Photos access in System Settings to shuffle videos as wallpaper."
         case .noVideos:
@@ -30,11 +28,16 @@ enum PhotosShuffleOutcome: Equatable {
     }
 }
 
-/// Fetches random videos from the Photos library for shuffle mode.
-/// Stateless — every method is independently callable from any isolation.
-final class PhotosService: Sendable {
+enum PhotosShuffleOutcome: Equatable {
+    case video(URL)
+    case failed(PhotosShuffleFailure)
+}
 
-    func requestAccess() async -> Bool {
+/// Fetches random videos from the Photos library for shuffle mode.
+/// Stateless, so callable from any isolation.
+enum PhotosService {
+
+    private static func requestAccess() async -> Bool {
         // `.readWrite` is the minimal access level that can read the library —
         // PHAccessLevel offers only `.addOnly` and `.readWrite`, no read-only level.
         let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
@@ -45,10 +48,10 @@ final class PhotosService: Sendable {
 
     /// Fetch a random video from the entire Photos library.
     /// Tries up to 3 random assets if export fails (iCloud-only, corrupted, etc.).
-    func shuffle() async -> PhotosShuffleOutcome {
+    static func shuffle() async -> PhotosShuffleOutcome {
         guard await requestAccess() else {
             Log.photos.notice("Photos access denied; cannot shuffle")
-            return .accessDenied
+            return .failed(.accessDenied)
         }
 
         let options = PHFetchOptions()
@@ -56,7 +59,7 @@ final class PhotosService: Sendable {
         let allVideos = PHAsset.fetchAssets(with: options)
         guard allVideos.count > 0 else {
             Log.photos.notice("No videos found in Photos library")
-            return .noVideos
+            return .failed(.noVideos)
         }
 
         for attempt in 0..<3 {
@@ -66,10 +69,10 @@ final class PhotosService: Sendable {
             }
             Log.photos.notice("Shuffle export attempt \(attempt + 1, privacy: .public)/3 failed")
         }
-        return .exportFailed
+        return .failed(.exportFailed)
     }
 
-    private func exportVideo(asset: PHAsset) async -> URL? {
+    private static func exportVideo(asset: PHAsset) async -> URL? {
         let cacheDir = AppPaths.photosShuffleCache
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
 
@@ -81,8 +84,8 @@ final class PhotosService: Sendable {
 
         // Request export session with a 15s timeout to avoid hanging on iCloud assets
         nonisolated(unsafe) var exportSession: AVAssetExportSession?
-        let gotSession = await withTimeout(seconds: 15) { [self] in
-            exportSession = await self.requestExportSession(for: asset)
+        let gotSession = await withTimeout(seconds: 15) {
+            exportSession = await requestExportSession(for: asset)
             return exportSession != nil
         } ?? false
 
@@ -90,8 +93,8 @@ final class PhotosService: Sendable {
 
         // Export with a 30s timeout
         nonisolated(unsafe) let sendableSession = session
-        let exported = await withTimeout(seconds: 30) { [self] in
-            await self.export(session: sendableSession, to: destURL)
+        let exported = await withTimeout(seconds: 30) {
+            await export(session: sendableSession, to: destURL)
         } ?? false
 
         if exported, FileManager.default.fileExists(atPath: destURL.path(percentEncoded: false)) {
@@ -103,11 +106,11 @@ final class PhotosService: Sendable {
         return nil
     }
 
-    private func requestExportSession(for asset: PHAsset) async -> AVAssetExportSession? {
+    private static func requestExportSession(for asset: PHAsset) async -> AVAssetExportSession? {
         // The cancellation handler runs concurrently with the operation, so the
-        // request ID is published through a lock-guarded box rather than a bare
+        // request ID is published through a lock rather than a bare
         // `nonisolated(unsafe) var` (which would be an unsynchronized read/write race).
-        let requestID = RequestIDBox()
+        let requestID = OSAllocatedUnfairLock(initialState: PHInvalidImageRequestID)
         nonisolated(unsafe) var exportSession: AVAssetExportSession?
 
         await withTaskCancellationHandler(operation: {
@@ -116,17 +119,18 @@ final class PhotosService: Sendable {
                 reqOptions.isNetworkAccessAllowed = true
                 reqOptions.deliveryMode = .highQualityFormat
 
-                requestID.set(PHImageManager.default().requestExportSession(
+                let id = PHImageManager.default().requestExportSession(
                     forVideo: asset,
                     options: reqOptions,
                     exportPreset: AVAssetExportPresetHighestQuality
                 ) { session, _ in
                     exportSession = session
                     continuation.resume()
-                })
+                }
+                requestID.withLock { $0 = id }
             }
         }, onCancel: {
-            let id = requestID.current
+            let id = requestID.withLock { $0 }
             if id != PHInvalidImageRequestID {
                 PHImageManager.default().cancelImageRequest(id)
             }
@@ -135,7 +139,7 @@ final class PhotosService: Sendable {
         return exportSession
     }
 
-    private func export(session: AVAssetExportSession, to destURL: URL) async -> Bool {
+    private static func export(session: AVAssetExportSession, to destURL: URL) async -> Bool {
         nonisolated(unsafe) let session = session
         return await withTaskCancellationHandler(operation: {
             do {
@@ -147,21 +151,6 @@ final class PhotosService: Sendable {
         }, onCancel: {
             session.cancelExport()
         })
-    }
-}
-
-/// Lock-guarded holder for a `PHImageRequestID` published from the export-session
-/// operation closure and read by the concurrent cancellation handler.
-private final class RequestIDBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value: PHImageRequestID = PHInvalidImageRequestID
-    func set(_ id: PHImageRequestID) {
-        lock.lock(); defer { lock.unlock() }
-        value = id
-    }
-    var current: PHImageRequestID {
-        lock.lock(); defer { lock.unlock() }
-        return value
     }
 }
 

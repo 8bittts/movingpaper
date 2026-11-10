@@ -6,7 +6,7 @@ import Foundation
 @MainActor
 final class PowerStateMonitor {
     private var observers: [NSObjectProtocol] = []
-    private var lastVerdict: Bool = false
+    private var lastVerdict = false
     private let onChange: (Bool) -> Void
 
     init(onChange: @escaping (Bool) -> Void) {
@@ -15,25 +15,16 @@ final class PowerStateMonitor {
 
     /// Begin observing. Emits the current verdict immediately.
     func start() {
-        let center = NotificationCenter.default
-
-        let lowPower = center.addObserver(
-            forName: .NSProcessInfoPowerStateDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in self?.evaluate() }
+        observers = [
+            Notification.Name.NSProcessInfoPowerStateDidChange,
+            ProcessInfo.thermalStateDidChangeNotification,
+        ].map { name in
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.evaluate()
+                }
+            }
         }
-
-        let thermal = center.addObserver(
-            forName: ProcessInfo.thermalStateDidChangeNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in self?.evaluate() }
-        }
-
-        observers = [lowPower, thermal]
         lastVerdict = Self.shouldPause(processInfo: .processInfo)
         onChange(lastVerdict)
     }

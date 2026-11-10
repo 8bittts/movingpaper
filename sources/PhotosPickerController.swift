@@ -10,13 +10,8 @@ final class PhotosPickerController: NSObject {
     private var panel: NSPanel?
     private var continuation: CheckedContinuation<URL?, Never>?
 
-    /// Tracks whether a picker is currently showing to prevent duplicates.
-    static var isShowing = false
-
     /// Show the Photos picker and wait for user selection. Returns nil if cancelled.
     func run() async -> URL? {
-        guard !Self.isShowing else { return nil }
-        Self.isShowing = true
         var config = PHPickerConfiguration(photoLibrary: .shared())
         config.filter = .videos
         config.selectionLimit = 1
@@ -51,27 +46,23 @@ final class PhotosPickerController: NSObject {
         }
     }
 
+    /// Resolve the pending `run()` once. Closing the panel lands in
+    /// `windowWillClose`, which calls back in with nothing left to resume.
     private func finish(with url: URL?) {
-        let cont = continuation
-        continuation = nil
-
-        Self.isShowing = false
+        guard let continuation else { return }
+        self.continuation = nil
         panel?.close()
-
-        cont?.resume(returning: url)
+        continuation.resume(returning: url)
     }
 }
 
 // MARK: - NSWindowDelegate
 
 extension PhotosPickerController: NSWindowDelegate {
+    /// The user closed the panel without picking.
     nonisolated func windowWillClose(_ notification: Notification) {
         MainActor.assumeIsolated {
-            Self.isShowing = false
-            AppPresentation.returnToAccessory()
-            let cont = continuation
-            continuation = nil
-            cont?.resume(returning: nil)
+            finish(with: nil)
         }
     }
 }
@@ -89,8 +80,8 @@ extension PhotosPickerController: PHPickerViewControllerDelegate {
         let cacheDir = AppPaths.photosPickerCache
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
 
-        let provider = result.itemProvider
-        provider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { tempURL, _ in
+        // The temporary file exists only inside this callback, so the copy happens here.
+        result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { tempURL, _ in
             var cachedURL: URL?
             if let tempURL {
                 let ext = tempURL.pathExtension

@@ -6,29 +6,26 @@ enum AppPaths {
     private static let rootName = "MovingPaper"
 
     static var applicationSupport: URL {
-        FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first!
-            .appendingPathComponent(rootName, isDirectory: true)
+        URL.applicationSupportDirectory.appending(path: rootName, directoryHint: .isDirectory)
     }
 
     /// Cache directory for downloaded YouTube videos.
     static var youtubeCache: URL {
-        applicationSupport.appendingPathComponent("YouTube", isDirectory: true)
+        applicationSupport.appending(path: "YouTube", directoryHint: .isDirectory)
     }
 
     /// Cache directory for videos exported from Photos via the picker.
     static var photosPickerCache: URL {
-        applicationSupport.appendingPathComponent("Photos", isDirectory: true)
+        applicationSupport.appending(path: "Photos", directoryHint: .isDirectory)
     }
 
     /// Cache directory for randomly-shuffled Photos videos.
     static var photosShuffleCache: URL {
-        applicationSupport.appendingPathComponent("PhotosShuffle", isDirectory: true)
+        applicationSupport.appending(path: "PhotosShuffle", directoryHint: .isDirectory)
     }
 
     /// On-disk location of the yt-dlp binary (downloaded on first use).
     static var ytdlpBinary: URL {
-        applicationSupport.appendingPathComponent("yt-dlp")
+        applicationSupport.appending(path: "yt-dlp", directoryHint: .notDirectory)
     }
 }

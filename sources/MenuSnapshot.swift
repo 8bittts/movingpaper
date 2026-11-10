@@ -58,8 +58,7 @@ enum MenuRow: Equatable {
     case separator
     case sectionHeader(String)
     case command(MenuCommand)
-    case submenu(title: String, rows: [MenuRow])
-    case item(title: String, checked: Bool, children: [MenuRow])
+    case submenu(title: String, checked: Bool = false, rows: [MenuRow])
 }
 
 /// Pure status-menu structure. `StatusBarController` turns these rows into `NSMenuItem`s.
@@ -140,16 +139,10 @@ enum MenuSnapshot {
             index: index,
             fileName: space.fileName ?? "No MovingPaper"
         )
-        let children: [MenuRow]
-        if space.isCurrent {
-            children = sourceCommands(
-                displayID: displayID,
-                includeRemove: space.fileName != nil
-            )
-        } else {
-            children = [.disabled("Switch to this desktop to change")]
-        }
-        return .item(title: label, checked: space.isCurrent, children: children)
+        let rows: [MenuRow] = space.isCurrent
+            ? sourceCommands(displayID: displayID, includeRemove: space.fileName != nil)
+            : [.disabled("Switch to this desktop to change")]
+        return .submenu(title: label, checked: space.isCurrent, rows: rows)
     }
 
     private static func sourceCommands(

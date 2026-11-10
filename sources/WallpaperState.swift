@@ -38,10 +38,9 @@ struct WallpaperState: Equatable {
 
     mutating func setEntry(_ entry: WallpaperEntry, for key: DesktopKey) {
         entries[key] = entry
-        // spaceID 0 is the all-desktops sentinel (DesktopKey(displayID:)), never a
-        // real Space. Recording it would surface a phantom "Desktop 1" row in the
-        // Per Desktop menu after an all-desktops restore-redownload.
-        if key.spaceID != 0 {
+        // Recording the all-desktops sentinel would surface a phantom "Desktop 1"
+        // row in the Per Desktop menu after an all-desktops restore-redownload.
+        if !key.isAllDesktops {
             knownSpaces[key.displayID, default: []].insert(key.spaceID)
         }
     }

@@ -40,7 +40,7 @@ struct MenuSnapshotTests {
         let rows = MenuSnapshot.rows(from: input)
 
         #expect(containsCommand(rows, id: .toggleMute, title: "Turn Sound Off"))
-        guard case .submenu(let title, let modeRows) = rows.first(where: {
+        guard case .submenu(let title, _, let modeRows) = rows.first(where: {
             if case .submenu = $0 { return true }
             return false
         }) else {
@@ -77,7 +77,7 @@ struct MenuSnapshotTests {
         ]
         let rows = MenuSnapshot.rows(from: input)
 
-        guard case .item(let currentTitle, let currentChecked, let currentChildren) = rows[0] else {
+        guard case .submenu(let currentTitle, let currentChecked, let currentChildren) = rows[0] else {
             Issue.record("Expected current-space item")
             return
         }
@@ -87,7 +87,7 @@ struct MenuSnapshotTests {
         #expect(command(currentChildren[0])?.displayID == displayA)
         #expect(command(currentChildren[4])?.id == .clearDisplay)
 
-        guard case .item(_, let otherChecked, let otherChildren) = rows[1] else {
+        guard case .submenu(_, let otherChecked, let otherChildren) = rows[1] else {
             Issue.record("Expected other-space item")
             return
         }
@@ -189,7 +189,7 @@ struct MenuSnapshotTests {
             switch row {
             case .command(let command):
                 return [command.title]
-            case .submenu(let title, let children), .item(let title, _, let children):
+            case .submenu(let title, _, let children):
                 return [title] + commandTitles(children)
             case .disabled(let title), .sectionHeader(let title):
                 return [title]
@@ -204,7 +204,7 @@ struct MenuSnapshotTests {
             switch row {
             case .command(let command) where command.id == id:
                 return command
-            case .submenu(_, let children), .item(_, _, let children):
+            case .submenu(_, _, let children):
                 if let found = firstCommand(children, id: id) { return found }
             default:
                 continue

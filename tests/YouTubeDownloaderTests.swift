@@ -89,14 +89,15 @@ struct YouTubeDownloaderTests {
         let downloader = sandbox.makeDownloader()
         var reported: [Double?] = []
 
-        let task = Task {
+        let task = Task { @MainActor in
             await downloader.download(youtubeURL: Self.videoURL) { reported.append($0) }
         }
         try await waitUntil { downloader.progress == 0.42 }
         let expected = sandbox.cache.appending(path: "\(Self.videoID).mp4")
         FileManager.default.createFile(atPath: expected.path(percentEncoded: false) + ".release", contents: nil)
 
-        #expect(await task.value == .success(expected))
+        let outcome = await task.value
+        #expect(outcome == .success(expected))
         #expect(reported == [0, 0.42, nil])
         #expect(downloader.progress == nil)
     }
@@ -156,13 +157,14 @@ struct YouTubeDownloaderTests {
         let downloader = sandbox.makeDownloader()
         var reported: [Double?] = []
 
-        let task = Task {
+        let task = Task { @MainActor in
             await downloader.download(youtubeURL: Self.videoURL) { reported.append($0) }
         }
         try await waitUntil { downloader.progress == 0.1 }
         downloader.cancel()
 
-        #expect(await task.value == .cancelled)
+        let outcome = await task.value
+        #expect(outcome == .cancelled)
         #expect(reported.last == .some(nil))
         #expect(sandbox.cachedNames.isEmpty)
     }
@@ -174,11 +176,12 @@ struct YouTubeDownloaderTests {
         """)
         let downloader = sandbox.makeDownloader()
 
-        let task = Task { await downloader.download(youtubeURL: Self.videoURL) }
+        let task = Task { @MainActor in await downloader.download(youtubeURL: Self.videoURL) }
         try await waitUntil { downloader.progress == 0.1 }
         task.cancel()
 
-        #expect(await task.value == .cancelled)
+        let outcome = await task.value
+        #expect(outcome == .cancelled)
         #expect(downloader.progress == nil)
     }
 
@@ -192,14 +195,16 @@ struct YouTubeDownloaderTests {
         """)
         let downloader = sandbox.makeDownloader()
 
-        let first = Task { await downloader.download(youtubeURL: Self.videoURL) }
+        let first = Task { @MainActor in await downloader.download(youtubeURL: Self.videoURL) }
         try await waitUntil { downloader.progress == 0.1 }
-        let second = Task { await downloader.download(youtubeURL: "https://youtu.be/aaaaaaaaaaa") }
+        let second = Task { @MainActor in await downloader.download(youtubeURL: "https://youtu.be/aaaaaaaaaaa") }
         await Task.yield()
         downloader.cancel()
 
-        #expect(await first.value == .cancelled)
-        #expect(await second.value == .success(sandbox.cache.appending(path: "aaaaaaaaaaa.mp4")))
+        let firstOutcome = await first.value
+        let secondOutcome = await second.value
+        #expect(firstOutcome == .cancelled)
+        #expect(secondOutcome == .success(sandbox.cache.appending(path: "aaaaaaaaaaa.mp4")))
     }
 
     // MARK: - Parsing

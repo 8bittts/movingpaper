@@ -4,7 +4,7 @@ import AppKit
 enum AppPresentation {
     static func promoteToForeground() {
         NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
     }
 
     static func returnToAccessory() {

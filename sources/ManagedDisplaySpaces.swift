@@ -1,6 +1,4 @@
 import AppKit
-import CoreGraphics
-import Foundation
 
 @_silgen_name("CGSMainConnectionID")
 private func CGSMainConnectionID() -> UInt32
@@ -21,8 +19,14 @@ struct ManagedDisplaySpacesSnapshot: Equatable {
         return from(
             rawEntries: rawEntries,
             screensByDisplayIdentifier: displayIdentifiers(for: screens),
-            fallbackGlobalSpaceID: currentGlobalSpaceID()
+            fallbackGlobalSpaceID: activeGlobalSpaceID()
         )
+    }
+
+    /// The active Space of the display with keyboard focus. The fallback for a
+    /// display the managed-spaces snapshot does not list.
+    static func activeGlobalSpaceID() -> UInt64 {
+        CGSGetActiveSpace(CGSMainConnectionID())
     }
 
     static func from(
@@ -94,20 +98,7 @@ struct ManagedDisplaySpacesSnapshot: Equatable {
     }
 
     private static func spaceID(from value: Any?) -> UInt64? {
-        guard let dictionary = value as? [String: Any] else { return nil }
-        if let id = dictionary["id64"] as? NSNumber {
-            return id.uint64Value
-        }
-        if let id = dictionary["id64"] as? UInt64 {
-            return id
-        }
-        if let id = dictionary["id64"] as? Int {
-            return UInt64(id)
-        }
-        return nil
+        // Every numeric plist value bridges to NSNumber, whatever its width.
+        ((value as? [String: Any])?["id64"] as? NSNumber)?.uint64Value
     }
-}
-
-func currentGlobalSpaceID() -> UInt64 {
-    CGSGetActiveSpace(CGSMainConnectionID())
 }

@@ -8,40 +8,34 @@ final class WallpaperManager {
     // MARK: - State
 
     /// All per-desktop wallpaper assignments, playback positions, and observed Spaces.
-    var state: WallpaperState = .init()
-
+    private var state = WallpaperState()
     /// Whether all desktops share one wallpaper or each gets its own.
-    var mode: WallpaperMode = .allDesktops
-
+    private var mode = WallpaperMode.allDesktops
     /// User-initiated pause (distinct from system pause).
-    var isPaused: Bool = false
-
-    /// Whether video audio is muted.
-    var isMuted: Bool = true
-
-    /// YouTube downloader for pasting YouTube URLs as wallpapers.
-    private let youtubeDownloader = YouTubeDownloader()
-
-    /// Photos library access for shuffle mode.
-    private let photosService = PhotosService()
-
-    // MARK: - Private State
-
-    private let router = WallpaperWindowRouter()
-    private var screenObserver: Any?
-    private var spaceObserver: Any?
-    private var powerMonitor: PowerStateMonitor?
-    private var systemPaused: Bool = false
-    private let loadingOverlay = LoadingOverlayController()
-    private let requestCoordinator = WallpaperRequestCoordinator()
-    private let persistenceStore = WallpaperPersistenceStore()
-    private var restoreTask: Task<Void, Never>?
+    private var isPaused = false
+    private var isMuted = true
+    /// Pause imposed by Low Power Mode or thermal pressure.
+    private var systemPaused = false
+    private var activeSpaceIDs: [CGDirectDisplayID: UInt64] = [:]
     /// YouTube redownloads still outstanding this session, keyed by desktop.
     /// Re-persisted on every save so an unrelated save can't erase them before
     /// the download finishes; dropped when resolved or the desktop is cleared.
     private var pendingRedownloads: [DesktopKey: WallpaperRedownloadRequest] = [:]
-    private(set) var activeSpaceIDs: [CGDirectDisplayID: UInt64] = [:]
-    private var lastPlaybackFailurePath: String?
+    /// Files already reported as unplayable, so each one alerts once until it
+    /// is assigned again.
+    private var reportedPlaybackFailures: Set<String> = []
+
+    // MARK: - Collaborators
+
+    private let router = WallpaperWindowRouter()
+    private let youtubeDownloader = YouTubeDownloader()
+    private let loadingOverlay = LoadingOverlayController()
+    private let requestCoordinator = WallpaperRequestCoordinator()
+    private let persistenceStore = WallpaperPersistenceStore()
+    private var powerMonitor: PowerStateMonitor?
+    private var screenObserver: Any?
+    private var spaceObserver: Any?
+    private var restoreTask: Task<Void, Never>?
 
     init() {
         router.onPlaybackFailure = { [weak self] url, message in
@@ -54,6 +48,34 @@ final class WallpaperManager {
         observePowerState()
     }
 
+    func tearDown() {
+        cancelAllRequests()
+        tearDownWindows()
+        if let screenObserver {
+            NotificationCenter.default.removeObserver(screenObserver)
+        }
+        if let spaceObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver)
+        }
+        screenObserver = nil
+        spaceObserver = nil
+        powerMonitor?.stop()
+        powerMonitor = nil
+    }
+
+    // MARK: - Displays and Spaces
+
+    private var connectedDisplayIDs: [CGDirectDisplayID] {
+        NSScreen.screens.compactMap(\.displayID)
+    }
+
+    /// Resolve the `NSScreen` for a target display, or nil (→ main screen) for the
+    /// all-desktops / no-target case.
+    private func screen(for displayID: CGDirectDisplayID?) -> NSScreen? {
+        guard let displayID else { return nil }
+        return NSScreen.screens.first { $0.displayID == displayID }
+    }
+
     private func refreshManagedDisplaySpaces() {
         let snapshot = ManagedDisplaySpacesSnapshot.current()
         activeSpaceIDs = snapshot.activeSpaceByDisplayID
@@ -64,55 +86,20 @@ final class WallpaperManager {
     }
 
     private func currentSpaceID(for displayID: CGDirectDisplayID) -> UInt64 {
-        activeSpaceIDs[displayID] ?? currentGlobalSpaceID()
+        activeSpaceIDs[displayID] ?? ManagedDisplaySpacesSnapshot.activeGlobalSpaceID()
     }
 
-    // MARK: - Computed Helpers
-
-    /// In allDesktops mode, returns the single shared file URL (if any).
-    var sharedFileURL: URL? {
-        guard mode == .allDesktops else { return nil }
-        return state.sharedLocalURL
-    }
-
-    /// File URL for a display, respecting the current mode and space.
-    func fileURL(for displayID: CGDirectDisplayID) -> URL? {
-        state.localURL(for: desktopKey(for: displayID))
-    }
-
-    /// Determine file type from URL extension.
-    func fileType(for url: URL) -> WallpaperFileType? {
-        WallpaperFileType.detect(for: url)
-    }
-
-    /// All connected displays.
-    var connectedDisplays: [(id: CGDirectDisplayID, name: String)] {
-        NSScreen.screens.compactMap { screen in
-            guard let id = screen.displayID else { return nil }
-            return (id: id, name: screen.localizedName)
+    /// The DesktopKey for a display on the current space, respecting mode.
+    private func desktopKey(for displayID: CGDirectDisplayID) -> DesktopKey {
+        switch mode {
+        case .allDesktops:
+            DesktopKey(displayID: displayID)
+        case .perDesktop:
+            DesktopKey(displayID: displayID, spaceID: currentSpaceID(for: displayID))
         }
     }
 
-    /// Display IDs of all connected screens.
-    private var connectedDisplayIDs: [CGDirectDisplayID] {
-        NSScreen.screens.compactMap(\.displayID)
-    }
-
-    /// All known Spaces for a display, sorted by space ID.
-    /// Includes Spaces with and without wallpapers — we track every Space the user visits.
-    func spaceAssignments(for displayID: CGDirectDisplayID) -> [(spaceID: UInt64, fileName: String?, isCurrent: Bool)] {
-        let spaces = state.knownSpaces[displayID] ?? []
-        let currentSpace = currentSpaceID(for: displayID)
-        return spaces.sorted().map { spaceID in
-            let key = DesktopKey(displayID: displayID, spaceID: spaceID)
-            // nil means no wallpaper on this Space — the UI supplies the label.
-            let fileName = state.localURL(for: key)?.lastPathComponent
-            return (spaceID: spaceID, fileName: fileName, isCurrent: spaceID == currentSpace)
-        }
-    }
-
-    /// Whether any desktop has a wallpaper assigned.
-    var hasAnyWallpaper: Bool { !state.isEmpty }
+    // MARK: - Menu
 
     /// Snapshot the status menu needs without exposing the downloader.
     func menuInput(canCheckForUpdates: Bool, openAtLogin: Bool) -> MenuModelInput {
@@ -121,24 +108,33 @@ final class WallpaperManager {
             mode: mode,
             isMuted: isMuted,
             isPaused: isPaused,
-            hasAnyWallpaper: hasAnyWallpaper,
-            sharedFileName: sharedFileURL?.lastPathComponent,
+            hasAnyWallpaper: !state.isEmpty,
+            sharedFileName: mode == .allDesktops ? state.sharedLocalURL?.lastPathComponent : nil,
             canCheckForUpdates: canCheckForUpdates,
             openAtLogin: openAtLogin,
-            displays: connectedDisplays.map { display in
-                DisplayMenuInput(
-                    id: display.id,
-                    name: display.name,
-                    spaces: spaceAssignments(for: display.id).map {
-                        SpaceMenuInput(fileName: $0.fileName, isCurrent: $0.isCurrent)
-                    }
-                )
+            displays: NSScreen.screens.compactMap { screen in
+                screen.displayID.map { displayID in
+                    DisplayMenuInput(
+                        id: displayID,
+                        name: screen.localizedName,
+                        spaces: spaceMenuInputs(for: displayID)
+                    )
+                }
             }
         )
     }
 
-    func cancelDownload() {
-        youtubeDownloader.cancel()
+    /// Every known Space of a display, sorted by space ID, with and without
+    /// wallpapers — we track every Space the user visits.
+    private func spaceMenuInputs(for displayID: CGDirectDisplayID) -> [SpaceMenuInput] {
+        let currentSpace = currentSpaceID(for: displayID)
+        return (state.knownSpaces[displayID] ?? []).sorted().map { spaceID in
+            let key = DesktopKey(displayID: displayID, spaceID: spaceID)
+            return SpaceMenuInput(
+                fileName: state.localURL(for: key)?.lastPathComponent,
+                isCurrent: spaceID == currentSpace
+            )
+        }
     }
 
     /// Local file paths currently referenced by live wallpaper assignments.
@@ -147,13 +143,10 @@ final class WallpaperManager {
         Set(state.entries.values.map { $0.localURL.path(percentEncoded: false) })
     }
 
-    // MARK: - File Selection
+    // MARK: - Request Cancellation
 
     private func assignmentTarget(for displayID: CGDirectDisplayID?) -> WallpaperAssignmentTarget {
-        if let displayID {
-            return .display(displayID)
-        }
-        return .allDesktops
+        displayID.map { .display($0) } ?? .allDesktops
     }
 
     /// Cancelling the restore Task propagates through `withTaskCancellationHandler`
@@ -164,25 +157,32 @@ final class WallpaperManager {
         restoreTask = nil
     }
 
+    /// Cancel the in-flight request for one target and dismiss the UI it raised.
     private func cancelAssignment(for target: WallpaperAssignmentTarget) {
         requestCoordinator.cancel(target)
         loadingOverlay.hide()
         AppPresentation.returnToAccessory()
     }
 
-    private func cancelAllAssignments() {
+    /// Cancel every in-flight request, including the restore-redownload batch.
+    private func cancelAllRequests() {
         requestCoordinator.cancelAll()
+        cancelRestoreTask()
         loadingOverlay.hide()
         AppPresentation.returnToAccessory()
     }
+
+    func cancelDownload() {
+        youtubeDownloader.cancel()
+    }
+
+    // MARK: - Sources
 
     /// Open file picker and assign result.
     func selectFile(for displayID: CGDirectDisplayID? = nil) {
         AppPresentation.withForegroundActivation {
             let panel = NSOpenPanel()
-            panel.allowedContentTypes = [
-                .gif, .mpeg4Movie, .quickTimeMovie, .movie,
-            ]
+            panel.allowedContentTypes = [.gif, .mpeg4Movie, .quickTimeMovie, .movie]
             panel.allowsMultipleSelection = false
             panel.canChooseDirectories = false
             panel.message = "Choose a GIF or video file for your MovingPaper wallpaper"
@@ -197,58 +197,24 @@ final class WallpaperManager {
     ///
     /// This path uses only a local file (never the shared `YouTubeDownloader`), so
     /// it deliberately does NOT cancel the restore-redownload batch — that batch
-    /// self-skips any key already assigned (`state.entries[key] == nil` guard).
+    /// self-skips any key already assigned (`isAwaitingRedownload`).
     func setWallpaper(url: URL, for displayID: CGDirectDisplayID? = nil) {
         cancelAssignment(for: assignmentTarget(for: displayID))
         applyWallpaper(url: url, for: displayID)
     }
 
-    private func applyWallpaper(
-        url: URL,
-        for displayID: CGDirectDisplayID? = nil,
-        spaceID: UInt64? = nil,
-        youtubeOrigin: String? = nil
-    ) {
-        guard WallpaperFileType.detect(for: url) != nil else {
-            showAlert(
-                title: "Unsupported File",
-                message: "Choose a GIF or video file (.gif, .mp4, .mov, or .m4v).",
-                style: .informational
-            )
-            return
-        }
-
-        isPaused = false
-        let entry = WallpaperEntry(localURL: url, youtubeOrigin: youtubeOrigin)
-        let keys = state.assign(
-            entry,
-            mode: mode,
-            displayID: displayID,
-            spaceID: spaceID,
-            connectedDisplayIDs: connectedDisplayIDs,
-            currentSpaceID: { [self] id in currentSpaceID(for: id) }
-        )
-        for key in keys {
-            pendingRedownloads[key] = nil
-        }
-
-        saveState()
-        rebuildAllWindows()
-    }
-
     /// Download a YouTube video and set it as wallpaper.
     func setYouTubeWallpaper(urlString: String, for displayID: CGDirectDisplayID? = nil) {
         guard YouTubeURLParser.isYouTubeURL(urlString) else {
-            showAlert(
+            AppPresentation.showAlert(
                 title: "Invalid URL",
-                message: "That doesn't look like a YouTube URL.",
-                style: .informational
+                message: "That doesn't look like a YouTube URL."
             )
             return
         }
 
         let target = assignmentTarget(for: displayID)
-        let originSpaceID = displayID.map { currentSpaceID(for: $0) } ?? 0
+        let originSpaceID = displayID.map { currentSpaceID(for: $0) }
         cancelRestoreTask()
         requestCoordinator.start(for: target) { [weak self] token in
             guard let self else { return }
@@ -265,131 +231,66 @@ final class WallpaperManager {
                     spaceID: originSpaceID,
                     youtubeOrigin: urlString
                 )
-            case .failure(let msg):
-                showAlert(title: "Download Failed", message: msg, style: .warning)
+            case .failure(let message):
+                AppPresentation.showAlert(title: "Download Failed", message: message, style: .warning)
             case .cancelled:
                 break
             }
         }
     }
 
-    private func showAlert(
-        title: String,
-        message: String,
-        style: NSAlert.Style = .informational
-    ) {
-        AppPresentation.showAlert(title: title, message: message, style: style)
-    }
-
-    private func handlePlaybackFailure(url: URL, message: String) {
-        let path = url.path(percentEncoded: false)
-        Log.playback.error("Playback failed for \(path, privacy: .public): \(message, privacy: .public)")
-        guard lastPlaybackFailurePath != path else { return }
-        lastPlaybackFailurePath = path
-        showAlert(title: "Playback Failed", message: message, style: .warning)
-    }
-
-    // MARK: - Photos Shuffle
-
     /// Pick a random video from the entire Photos library and set it as wallpaper.
     func shuffleFromPhotos(for displayID: CGDirectDisplayID? = nil) {
         AppPresentation.promoteToForeground()
         let target = assignmentTarget(for: displayID)
-        let originSpaceID = displayID.map { currentSpaceID(for: $0) } ?? 0
+        let originSpaceID = displayID.map { currentSpaceID(for: $0) }
         requestCoordinator.start(for: target) { [weak self] token in
             guard let self else { return }
             loadingOverlay.show(message: "Shuffling…", on: screen(for: displayID))
-            let outcome = await photosService.shuffle()
+            let outcome = await PhotosService.shuffle()
             guard requestCoordinator.isCurrent(token, for: target) else { return }
             loadingOverlay.hide()
             AppPresentation.returnToAccessory()
+
             switch outcome {
             case .video(let url):
                 applyWallpaper(url: url, for: displayID, spaceID: originSpaceID)
-            case .accessDenied, .noVideos, .exportFailed:
-                if let title = outcome.alertTitle, let message = outcome.alertMessage {
-                    showAlert(title: title, message: message, style: .informational)
-                }
+            case .failed(let failure):
+                AppPresentation.showAlert(title: failure.alertTitle, message: failure.alertMessage)
             }
         }
     }
 
-    /// The DesktopKey for a display on the current space, respecting mode.
-    private func desktopKey(for displayID: CGDirectDisplayID) -> DesktopKey {
-        switch mode {
-        case .allDesktops:
-            return DesktopKey(displayID: displayID)
-        case .perDesktop:
-            return DesktopKey(displayID: displayID, spaceID: currentSpaceID(for: displayID))
-        }
-    }
-
-    /// Remove wallpaper from a specific display (current space in perDesktop mode).
-    func clearWallpaper(for displayID: CGDirectDisplayID) {
-        cancelAssignment(for: .display(displayID))
-        pendingRedownloads[desktopKey(for: displayID)] = nil
-        state.clearEntry(for: desktopKey(for: displayID))
-        router.closeController(for: displayID)
-        saveState()
-    }
-
-    /// Remove all wallpapers.
-    func clearAllWallpapers() {
-        cancelAllAssignments()
-        cancelRestoreTask()
-        pendingRedownloads.removeAll()
-        state.entries.removeAll()
-        state.playbackPositions.removeAll()
-        tearDownWindows()
-        saveState()
-    }
-
-    /// Switch modes.
-    func setMode(_ newMode: WallpaperMode) {
-        guard newMode != mode else { return }
-        cancelAllAssignments()
-        cancelRestoreTask()
-
-        switch newMode {
-        case .allDesktops:
-            if let shared = state.canonicalEntry {
-                state.applyShared(entry: shared, across: connectedDisplayIDs)
-            }
-        case .perDesktop:
-            state.migrateToPerDesktop { [activeSpaceIDs] displayID in
-                activeSpaceIDs[displayID] ?? currentGlobalSpaceID()
-            }
+    private func applyWallpaper(
+        url: URL,
+        for displayID: CGDirectDisplayID?,
+        spaceID: UInt64? = nil,
+        youtubeOrigin: String? = nil
+    ) {
+        guard WallpaperFileType.detect(for: url) != nil else {
+            AppPresentation.showAlert(
+                title: "Unsupported File",
+                message: "Choose a GIF or video file (.gif, .mp4, .mov, or .m4v)."
+            )
+            return
         }
 
-        mode = newMode
+        isPaused = false
+        reportedPlaybackFailures.remove(url.path(percentEncoded: false))
+        let keys = state.assign(
+            WallpaperEntry(localURL: url, youtubeOrigin: youtubeOrigin),
+            mode: mode,
+            displayID: displayID,
+            spaceID: spaceID,
+            connectedDisplayIDs: connectedDisplayIDs,
+            currentSpaceID: { [self] displayID in currentSpaceID(for: displayID) }
+        )
+        for key in keys {
+            pendingRedownloads[key] = nil
+        }
+
         saveState()
         rebuildAllWindows()
-    }
-
-    func togglePause() {
-        isPaused.toggle()
-        if isPaused {
-            cancelAllAssignments()
-            cancelRestoreTask()
-            tearDownWindows()
-        } else {
-            rebuildAllWindows()
-        }
-    }
-
-    func toggleMute() {
-        isMuted.toggle()
-        saveState()
-        router.setMuted(isMuted)
-    }
-
-    // MARK: - Loading Overlay
-
-    /// Resolve the `NSScreen` for a target display, or nil (→ main screen) for the
-    /// all-desktops / no-target case.
-    private func screen(for displayID: CGDirectDisplayID?) -> NSScreen? {
-        guard let displayID else { return nil }
-        return NSScreen.screens.first { $0.displayID == displayID }
     }
 
     /// Drives the overlay for one YouTube download: a fraction while it runs,
@@ -404,6 +305,70 @@ final class WallpaperManager {
             progress: progress,
             on: screen(for: displayID)
         )
+    }
+
+    private func handlePlaybackFailure(url: URL, message: String) {
+        let path = url.path(percentEncoded: false)
+        Log.playback.error("Playback failed for \(path, privacy: .public): \(message, privacy: .public)")
+        guard reportedPlaybackFailures.insert(path).inserted else { return }
+        AppPresentation.showAlert(title: "Playback Failed", message: message, style: .warning)
+    }
+
+    // MARK: - Removal, Mode, Playback
+
+    /// Remove wallpaper from a specific display (current space in perDesktop mode).
+    func clearWallpaper(for displayID: CGDirectDisplayID) {
+        cancelAssignment(for: .display(displayID))
+        let key = desktopKey(for: displayID)
+        pendingRedownloads[key] = nil
+        state.clearEntry(for: key)
+        router.closeController(for: displayID)
+        saveState()
+    }
+
+    /// Remove all wallpapers.
+    func clearAllWallpapers() {
+        cancelAllRequests()
+        pendingRedownloads.removeAll()
+        state.entries.removeAll()
+        state.playbackPositions.removeAll()
+        tearDownWindows()
+        saveState()
+    }
+
+    /// Switch modes.
+    func setMode(_ newMode: WallpaperMode) {
+        guard newMode != mode else { return }
+        cancelAllRequests()
+
+        switch newMode {
+        case .allDesktops:
+            if let shared = state.canonicalEntry {
+                state.applyShared(entry: shared, across: connectedDisplayIDs)
+            }
+        case .perDesktop:
+            state.migrateToPerDesktop { [self] displayID in currentSpaceID(for: displayID) }
+        }
+
+        mode = newMode
+        saveState()
+        rebuildAllWindows()
+    }
+
+    func togglePause() {
+        isPaused.toggle()
+        if isPaused {
+            cancelAllRequests()
+            tearDownWindows()
+        } else {
+            rebuildAllWindows()
+        }
+    }
+
+    func toggleMute() {
+        isMuted.toggle()
+        saveState()
+        router.setMuted(isMuted)
     }
 
     // MARK: - Persistence
@@ -479,7 +444,11 @@ final class WallpaperManager {
                 let message = failedCount == 1
                     ? "A YouTube wallpaper could not be redownloaded."
                     : "\(failedCount) YouTube wallpapers could not be redownloaded."
-                showAlert(title: "Couldn't Restore Some Wallpapers", message: message, style: .warning)
+                AppPresentation.showAlert(
+                    title: "Couldn't Restore Some Wallpapers",
+                    message: message,
+                    style: .warning
+                )
             }
 
             restoreTask = nil
@@ -488,7 +457,7 @@ final class WallpaperManager {
 
     // MARK: - Window Lifecycle
 
-    func rebuildAllWindows() {
+    private func rebuildAllWindows() {
         guard !isPaused else {
             tearDownWindows()
             return
@@ -496,9 +465,9 @@ final class WallpaperManager {
 
         router.setMuted(isMuted)
         router.reconcile(screens: NSScreen.screens) { [self] displayID in
-            guard let url = fileURL(for: displayID),
-                  let type = fileType(for: url) else { return nil }
             let key = desktopKey(for: displayID)
+            guard let url = state.localURL(for: key),
+                  let type = WallpaperFileType.detect(for: url) else { return nil }
             return WallpaperWindowRouter.Plan(
                 url: url,
                 type: type,
@@ -506,16 +475,6 @@ final class WallpaperManager {
             )
         }
         router.setPlaybackSuspended(systemPaused)
-    }
-
-    func tearDown() {
-        cancelAllAssignments()
-        cancelRestoreTask()
-        tearDownWindows()
-        removeScreenObserver()
-        removeSpaceObserver()
-        powerMonitor?.stop()
-        powerMonitor = nil
     }
 
     private func tearDownWindows() {
@@ -529,7 +488,7 @@ final class WallpaperManager {
         }
     }
 
-    // MARK: - Screen Changes
+    // MARK: - System Observers
 
     private func observeScreenChanges() {
         screenObserver = NotificationCenter.default.addObserver(
@@ -537,29 +496,19 @@ final class WallpaperManager {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.refreshManagedDisplaySpaces()
-
-                if self.mode == .allDesktops {
-                    if self.state.reconcileAllDesktops(connectedDisplayIDs: self.connectedDisplayIDs) {
-                        self.saveState()
-                    }
-                }
-
-                self.rebuildAllWindows()
+            MainActor.assumeIsolated {
+                self?.handleScreenChange()
             }
         }
     }
 
-    private func removeScreenObserver() {
-        if let observer = screenObserver {
-            NotificationCenter.default.removeObserver(observer)
-            screenObserver = nil
+    private func handleScreenChange() {
+        refreshManagedDisplaySpaces()
+        if mode == .allDesktops, state.reconcileAllDesktops(connectedDisplayIDs: connectedDisplayIDs) {
+            saveState()
         }
+        rebuildAllWindows()
     }
-
-    // MARK: - Space Changes
 
     private func observeSpaceChanges() {
         spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
@@ -567,27 +516,22 @@ final class WallpaperManager {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.savePlaybackPositions()
-                self.refreshManagedDisplaySpaces()
-                if self.mode == .allDesktops {
-                    // Panels have .canJoinAllSpaces — no rebuild needed
-                    return
-                }
-                self.rebuildAllWindows()
+            MainActor.assumeIsolated {
+                self?.handleSpaceChange()
             }
         }
     }
 
-    private func removeSpaceObserver() {
-        if let observer = spaceObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(observer)
-            spaceObserver = nil
+    private func handleSpaceChange() {
+        // Positions belong to the Space being left, so save them before the
+        // active-Space table moves on.
+        savePlaybackPositions()
+        refreshManagedDisplaySpaces()
+        // In allDesktops mode the panels have .canJoinAllSpaces — no rebuild needed.
+        if mode == .perDesktop {
+            rebuildAllWindows()
         }
     }
-
-    // MARK: - Power Management
 
     private func observePowerState() {
         let monitor = PowerStateMonitor { [weak self] shouldPause in
@@ -607,5 +551,4 @@ final class WallpaperManager {
             rebuildAllWindows()
         }
     }
-
 }

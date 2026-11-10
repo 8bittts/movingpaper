@@ -1,49 +1,37 @@
 import AppKit
-import Combine
 @preconcurrency import Sparkle
 
 /// Sparkle auto-updater wrapper for MovingPaper.
 /// Uses Sparkle's standard UI (native macOS alerts) with activation policy
 /// management for menu-bar-only apps.
 @MainActor
-final class MovingPaperUpdater: NSObject, ObservableObject {
+final class MovingPaperUpdater: NSObject {
 
-    @Published private(set) var canCheckForUpdates = false
-
+    /// Nil when the host bundle carries no Sparkle configuration (`swift run`).
     private var updaterController: SPUStandardUpdaterController?
-    private var cancellables = Set<AnyCancellable>()
-    private var started = false
     private var windowObserver: Any?
+
+    /// Whether Sparkle can start a check right now. The status menu reads it
+    /// each time it opens.
+    var canCheckForUpdates: Bool {
+        updaterController?.updater.canCheckForUpdates ?? false
+    }
 
     override init() {
         super.init()
 
         guard Self.hostHasSparkleConfig() else { return }
-
-        let controller = SPUStandardUpdaterController(
+        updaterController = SPUStandardUpdaterController(
             startingUpdater: false,
             updaterDelegate: self,
             userDriverDelegate: self
         )
-        self.updaterController = controller
-
-        controller.updater
-            .publisher(for: \.canCheckForUpdates)
-            .receive(on: RunLoop.main)
-            .sink { [weak self] value in
-                self?.canCheckForUpdates = value
-            }
-            .store(in: &cancellables)
     }
 
     /// Start the updater (call once after app launch).
     func start() {
-        guard !started else { return }
-        started = true
-        guard let controller = updaterController else { return }
-
         do {
-            try controller.updater.start()
+            try updaterController?.updater.start()
         } catch {
             Log.updater.error("Updater failed to start: \(error.localizedDescription, privacy: .public)")
         }
@@ -87,18 +75,11 @@ final class MovingPaperUpdater: NSObject, ObservableObject {
 
     // MARK: - Host Validation
 
-    nonisolated private static func hostHasSparkleConfig() -> Bool {
-        guard let bundleID = Bundle.main.bundleIdentifier,
-              !bundleID.isEmpty else { return false }
-        guard let buildVersion = Bundle.main.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as? String,
-              !buildVersion.isEmpty else { return false }
-        guard let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
-              !shortVersion.isEmpty else { return false }
-        guard let feedURL = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String,
-              !feedURL.isEmpty else { return false }
-        guard let pubKey = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String,
-              !pubKey.isEmpty else { return false }
-        return true
+    private static func hostHasSparkleConfig() -> Bool {
+        ["CFBundleIdentifier", "CFBundleVersion", "CFBundleShortVersionString", "SUFeedURL", "SUPublicEDKey"]
+            .allSatisfy { key in
+                (Bundle.main.object(forInfoDictionaryKey: key) as? String)?.isEmpty == false
+            }
     }
 }
 

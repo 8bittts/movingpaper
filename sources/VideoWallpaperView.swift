@@ -66,8 +66,13 @@ final class VideoWallpaperView: NSView, WallpaperContentView {
 
     func loadVideo(url: URL, resumeTime: CMTime? = nil) {
         tearDownPlayback()
+        guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else {
+            onFailure?(url, "The wallpaper file is missing.")
+            return
+        }
+
         let asset = AVURLAsset(url: url)
-        loadTask = Task { [weak self] in
+        loadTask = Task { @MainActor [weak self] in
             do {
                 // AVPlayerLooper needs duration loaded so loop points do not hitch,
                 // and an unplayable file never fails the player on its own.

@@ -6,6 +6,8 @@ enum YouTubeURLParser {
     private static let allowedHosts = Set(["youtube.com", "www.youtube.com", "m.youtube.com"])
     private static let allowedSchemes = Set(["http", "https"])
     private static let shortHost = "youtu.be"
+    /// Path prefixes that carry the video ID as the next component.
+    private static let idRoutes = Set(["shorts", "embed", "v"])
     private static let allowedIDCharacters = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-")
 
     /// Extract the 11-character video ID from a YouTube URL string.
@@ -20,36 +22,27 @@ enum YouTubeURLParser {
             return nil
         }
 
+        let pathParts = components.path.split(separator: "/").map(String.init)
+
         if host == shortHost {
-            return validVideoID(from: firstPathComponent(in: components.path))
+            return validVideoID(from: pathParts.first)
         }
 
         guard allowedHosts.contains(host) else { return nil }
 
-        switch components.path {
-        case "/watch":
+        if components.path == "/watch" {
             return components.queryItems?
                 .first { $0.name == "v" }
                 .flatMap { validVideoID(from: $0.value) }
-        case "/shorts", "/embed", "/v":
-            return nil
-        default:
-            let parts = components.path.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
-            guard let route = parts.first, ["shorts", "embed", "v"].contains(route) else {
-                return nil
-            }
-            return validVideoID(from: parts.dropFirst().first)
         }
+        guard let route = pathParts.first, idRoutes.contains(route) else { return nil }
+        return validVideoID(from: pathParts.dropFirst().first)
     }
 
     private static func normalizedURLCandidate(from string: String) -> String {
         guard !string.isEmpty else { return string }
         if string.contains("://") { return string }
         return "https://\(string)"
-    }
-
-    private static func firstPathComponent(in path: String) -> String? {
-        path.split(separator: "/", omittingEmptySubsequences: true).first.map(String.init)
     }
 
     private static func validVideoID(from value: String?) -> String? {

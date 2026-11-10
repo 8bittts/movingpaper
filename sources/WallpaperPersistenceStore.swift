@@ -158,7 +158,7 @@ struct WallpaperPersistenceStore {
             }
 
             let key = parsed.key
-            if key.spaceID != 0 {
+            if !key.isAllDesktops {
                 persisted.state.knownSpaces[key.displayID, default: []].insert(key.spaceID)
             }
 
