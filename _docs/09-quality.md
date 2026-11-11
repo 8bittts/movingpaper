@@ -21,7 +21,8 @@ Mutation-test a new guard by breaking what it protects and watching it fail.
 ## Static analysis
 
 Periphery 3.8.0 (`.periphery.yml`) finds unused code; install the final 3.8.0 binary from its GitHub release because upstream is archived and the Homebrew cask is stale.
-It passes `--build-system native` because Swift 6.4's default build system writes no index store where Periphery looks, and it retains public, `@objc`, protocol-parameter and assign-only declarations on purpose.
+Run `swift build --build-tests && periphery scan`: the config pins the index store to `.build/out`, where Swift 6.4's default build system writes it, and skips Periphery's own build, so the build with tests comes first.
+It retains public, `@objc`, protocol-parameter and assign-only declarations on purpose.
 CI's toolchain and SDK (the `macos-26` runner) trail a macOS 27 Mac's, so a construct that only the newer compiler or SDK accepts passes locally and fails there.
 Build with `-Xswiftc -warnings-as-errors` after raising the deployment target: each raise turns newly deprecated calls into warnings.
 

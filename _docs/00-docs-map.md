@@ -9,7 +9,7 @@ Agent routing lives in `AGENTS.md`; this index follows the fleet documentation s
 | ---------------------- | ----------------------------------------------------------------------------------------------------- |
 | `00-foundation.md`     | History, decisions and the audit closure record                                                       |
 | `01-architecture.md`   | Stack, wallpaper panel, coordinator seams, sources, status item, modes, build pipeline                |
-| `02-design-system.md`  | Marks, the status-item mark, overlay surface, menu symbols, typography, text patterns                |
+| `02-design-system.md`  | Marks, the status-item mark, overlay surface, menu symbols, typography, text patterns                 |
 | `04-security.md`       | Sandbox and permissions, signing and notarization, update-feed trust, yt-dlp supply chain, local data |
 | `05-infrastructure.md` | Scripts, release, distribution, Sparkle vendoring, CI, toolchain                                      |
 | `09-quality.md`        | Gates, test strategy, static analysis, manual verification                                            |
@@ -30,6 +30,7 @@ Agent routing lives in `AGENTS.md`; this index follows the fleet documentation s
 | `Casks/movingpaper.rb`     | Homebrew Cask, bumped by hand after a release                                                                                                                                                                  |
 | `tools/sparkle/VERSION`    | Sparkle vendoring pin read by the build preflight                                                                                                                                                              |
 | `.periphery.yml`           | Periphery configuration                                                                                                                                                                                        |
+| `.githooks/commit-msg`     | Tracked commit hook that refuses AI attribution; `scripts/setup-hooks.sh` wires it                                                                                                                             |
 | `.github/workflows/ci.yml` | CI: build and test only                                                                                                                                                                                        |
 | `videos/`                  | Sample wallpapers                                                                                                                                                                                              |
 | `../../dockishOS/_docs/`   | Sibling macOS app; it shares the Sparkle pipeline and owns the re-vendor procedure in [its infrastructure doc](../../dockishOS/_docs/05-infrastructure.md) ([its index](../../dockishOS/_docs/00-docs-map.md)) |

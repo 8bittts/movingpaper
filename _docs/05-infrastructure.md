@@ -55,4 +55,4 @@ Signing, notarization, Periphery and the smoke matrix run locally only.
 ## Toolchain
 
 `Package.swift` anchors the Sparkle search and rpath flags to the manifest so they resolve under Swift 6.4's default `swiftbuild` system and under `--build-system native`.
-Periphery 3.8.0 finds no index store under `swiftbuild`, so `.periphery.yml` passes `--build-system native` ([09-quality.md](09-quality.md)).
+Periphery 3.8.0 looks for the index store in the wrong place under `swiftbuild`, so `.periphery.yml` pins it to `.build/out` ([09-quality.md](09-quality.md)).

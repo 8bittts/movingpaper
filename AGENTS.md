@@ -5,7 +5,9 @@
 SwiftPM macOS menu-bar app (`sources/`, `tests/`).
 Validate with `swift test` and `./scripts/smoke-test.sh`; `--production` also verifies signing, notarization, checksum, and the signed appcast without launching the wallpaper app.
 `Package.swift` anchors the Sparkle search and rpath flags to the manifest, so they resolve under both Swift 6.4's default `swiftbuild` system (`.build/out`) and `--build-system native`.
-Periphery 3.8.0 is the exception: it finds no index store under `swiftbuild`, so `.periphery.yml` passes `--build-system native`.
+Periphery 3.8.0 looks for the index store in the wrong place under `swiftbuild`, so `.periphery.yml` pins it to `.build/out` and skips Periphery's own build; run `swift build --build-tests && periphery scan`.
+`Package.swift` states `swiftLanguageModes: [.v6]` explicitly.
+Run `./scripts/setup-hooks.sh` once per clone: it routes Git through `.githooks/commit-msg`, which refuses AI attribution (`tests/CommitMsgHookTests.swift` proves the hook).
 The script matrix, release flow and CI are in [_docs/05-infrastructure.md](_docs/05-infrastructure.md); the gates are in [_docs/09-quality.md](_docs/09-quality.md).
 Owner-doc index: [_docs/00-docs-map.md](_docs/00-docs-map.md), which follows the fleet documentation standard.
 
