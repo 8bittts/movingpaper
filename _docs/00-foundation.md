@@ -25,7 +25,7 @@ Dates are the evidence in this doc; the owner docs carry none.
 - **The menu-bar extra is branded.** The HIG prefers a template glyph, and the HIG pass used one; the operator chose the color app icon so the status item is recognizable as MovingPaper while it runs.
 - **macOS 27 only.** The app adopts the current system design without fallbacks, so the pre-26 HUD-material overlay and every availability check are gone. The cost is accepted: Macs on macOS 15 through 26 stay on v0.044, and CI can only compile until a hosted macOS 27 runner exists.
 - **System surfaces over brand chrome.** The loading overlay was a night-sky brand pill with a shimmer; it is now Liquid Glass with system text styles, and the brand stays in the app icon and the menu-bar mark ([02-design-system.md](02-design-system.md)).
-- **The Homebrew Cask is bumped by hand.** The release script does not touch `Casks/movingpaper.rb`; closing that gap is tracked in `todos.md`.
+- **The release script pins the Homebrew Cask.** The Cask was bumped by hand through v0.044 and trailed by up to five releases; `bump_cask` now runs inside the release commit ([05-infrastructure.md](05-infrastructure.md)).
 
 ## Audit closure (2026)
 

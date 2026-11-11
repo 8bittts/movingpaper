@@ -24,7 +24,7 @@ Build scripts, release pipeline, distribution channels, Sparkle vendoring and CI
 ## Release
 
 The release script bumps the version, builds and notarizes the DMG, tags the release and publishes it on GitHub Releases, and it updates the README's `<!-- version-badge -->` and `<!-- download-link -->` markers.
-It does not touch `Casks/movingpaper.rb`, so the Homebrew Cask is bumped by hand after a release and can lag the latest DMG; Sparkle auto-update keeps installed apps current between Cask bumps.
+It pins `Casks/movingpaper.rb` to the release's version and DMG checksum in the release commit (`bump_cask` in `scripts/lib/cask.sh`), so the Cask never trails a release; a change to the platform floor still needs a hand edit of the Cask's `depends_on macos:` line.
 Run `./scripts/smoke-test.sh --production` before shipping; in default mode an existing `build/MovingPaper.app` also triggers the release-artifact check, so a stale bundle without its DMG fails until `./scripts/build-dmg.sh` rebuilds it.
 Notarization uses the keychain profile `YEN-Notarization` unless `MOVINGPAPER_NOTARY_PROFILE` names another; the build writes `SUFeedURL`, `SURequireSignedFeed` and `SUVerifyUpdateBeforeExtraction` into the bundle's plist through `scripts/lib/plist.sh`.
 

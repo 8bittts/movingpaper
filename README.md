@@ -62,8 +62,8 @@ brew tap 8bittts/movingpaper https://github.com/8bittts/movingpaper
 brew install --cask 8bittts/movingpaper/movingpaper
 ```
 
-The Cask formula in [`Casks/movingpaper.rb`](Casks/movingpaper.rb) is bumped by hand after a release -- `release-movingpaper.sh` does not touch it -- so the tap can lag the latest DMG.
-Sparkle auto-update keeps installed apps current between Cask bumps.
+The Cask formula in [`Casks/movingpaper.rb`](Casks/movingpaper.rb) is pinned to the current release by `release-movingpaper.sh`.
+Sparkle auto-update keeps installed apps current between releases.
 
 ---
 

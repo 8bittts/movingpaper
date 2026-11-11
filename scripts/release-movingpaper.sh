@@ -9,6 +9,7 @@ APP_NAME="MovingPaper"
 GITHUB_REPO="8bittts/movingpaper"
 PLIST_FILE="sources/Resources/Info.plist"
 README_FILE="README.md"
+CASK_FILE="Casks/movingpaper.rb"
 
 info()  { printf "\033[1;34m==>\033[0m %s\n" "$1"; }
 warn()  { printf "\033[1;33mWARN:\033[0m %s\n" "$1"; }
@@ -51,6 +52,8 @@ verify_live_appcast() {
 
 # shellcheck source=lib/plist.sh
 source "${REPO_ROOT}/scripts/lib/plist.sh"
+# shellcheck source=lib/cask.sh
+source "${REPO_ROOT}/scripts/lib/cask.sh"
 
 bump_version() {
     local current="$1"
@@ -116,7 +119,9 @@ step "Updated release metadata"
 "${REPO_ROOT}/scripts/smoke-test.sh" --production
 step "Production smoke gate passed"
 
-git add "$PLIST_FILE" "$README_FILE"
+bump_cask "$CASK_FILE" "$NEXT_VERSION" "$SHA_FILE"
+
+git add "$PLIST_FILE" "$README_FILE" "$CASK_FILE"
 git commit -m "release: ${APP_NAME} v${NEXT_VERSION}"
 step "Committed release metadata"
 

@@ -20,6 +20,7 @@ Mutation-test a new guard by breaking what it protects and watching it fail.
 
 ## Static analysis
 
+`CaskBumpTests` runs `bump_cask` on a copy of the real Cask and proves the release script calls it before the release commit.
 Periphery 3.8.0 (`.periphery.yml`) finds unused code; install the final 3.8.0 binary from its GitHub release because upstream is archived and the Homebrew cask is stale.
 Run `swift build --build-tests && periphery scan`: the config pins the index store to `.build/out`, where Swift 6.4's default build system writes it, and skips Periphery's own build, so the build with tests comes first.
 It retains public, `@objc`, protocol-parameter and assign-only declarations on purpose.
