@@ -28,7 +28,7 @@ final class YouTubeDownloader {
     private var progressHandler: ProgressHandler?
     private var process: Process?
     /// Identifies the subprocess run in flight. `cancel` clears it, so a run
-    /// that exits without matching it was cancelled.
+    /// that exits without matching it was canceled.
     private var activeDownloadID: UUID?
 
     /// Serializes downloads so concurrent per-display requests each run to
@@ -140,7 +140,7 @@ final class YouTubeDownloader {
 
     /// Remove every cache file yt-dlp may have written for this video — the merged
     /// output, its `.part`, the per-format `<id>.f*.mp4/.m4a` streams (and their
-    /// `.part`s), and the `.ytdl` state file — so a cancelled or failed run doesn't
+    /// `.part`s), and the `.ytdl` state file — so a canceled or failed run doesn't
     /// orphan intermediates. Scoped to names beginning with "<videoID>." so it never
     /// touches another video's cached file.
     private func removeIntermediates(videoID: String) {

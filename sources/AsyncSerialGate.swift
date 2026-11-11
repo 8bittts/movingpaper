@@ -4,7 +4,7 @@ import Foundation
 /// at a time; overlapping callers queue and resume in arrival order.
 ///
 /// Because it is `@MainActor`, its own bookkeeping needs no locking. A caller
-/// whose task is cancelled while still queued is dropped from the queue and its
+/// whose task is canceled while still queued is dropped from the queue and its
 /// `run` returns `nil` (it never entered the critical section), so cancellation
 /// can never deadlock the queue.
 @MainActor
@@ -13,7 +13,7 @@ final class AsyncSerialGate {
     private var waiters: [(id: UUID, continuation: CheckedContinuation<Bool, Never>)] = []
 
     /// Run `operation` exclusively. Returns its result, or `nil` if the calling
-    /// task was cancelled before it acquired the gate (operation not run).
+    /// task was canceled before it acquired the gate (operation not run).
     func run<T: Sendable>(_ operation: () async -> T) async -> T? {
         guard await acquire() else { return nil }
         defer { release() }

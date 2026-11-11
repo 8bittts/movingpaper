@@ -98,7 +98,7 @@ struct WallpaperRequestCoordinatorTests {
         #expect(started)
 
         coordinator.cancel(.allDesktops)
-        // Let the cancelled sleep unwind.
+        // Let the canceled sleep unwind.
         for _ in 0..<5 { await Task.yield() }
 
         #expect(sawCancellation)

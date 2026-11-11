@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let manager = WallpaperManager()
         self.wallpaperManager = manager
 
-        // Evict stale cache entries off the main path; safe to drop if cancelled.
+        // Evict stale cache entries off the main path; safe to drop if canceled.
         // Protect files the restored wallpapers still reference so an eviction
         // can't blank a live desktop.
         let protectedPaths = manager.referencedLocalPaths

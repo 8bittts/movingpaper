@@ -10,7 +10,7 @@ final class PhotosPickerController: NSObject {
     private var panel: NSPanel?
     private var continuation: CheckedContinuation<URL?, Never>?
 
-    /// Show the Photos picker and wait for user selection. Returns nil if cancelled.
+    /// Show the Photos picker and wait for user selection. Returns nil if canceled.
     func run() async -> URL? {
         var config = PHPickerConfiguration(photoLibrary: .shared())
         config.filter = .videos

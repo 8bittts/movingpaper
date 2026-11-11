@@ -44,7 +44,7 @@ struct AsyncSerialGateTests {
         }
         while holderContinuation == nil { await Task.yield() }
 
-        // Waiter queues behind the holder, then is cancelled while queued.
+        // Waiter queues behind the holder, then is canceled while queued.
         let waiter = Task { @MainActor in
             await gate.run { () -> Bool in true }
         }
