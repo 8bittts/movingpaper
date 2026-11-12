@@ -46,7 +46,7 @@ struct WallpaperRequestCoordinatorTests {
             }
         }
 
-        coordinator.start(for: .display(CGDirectDisplayID(42))) { token in
+        coordinator.start(for: .desktop(DesktopKey(displayID: 42))) { token in
             displayToken = token
             await withCheckedContinuation { continuation in
                 secondContinuation = continuation
@@ -62,7 +62,7 @@ struct WallpaperRequestCoordinatorTests {
         }
 
         if let displayToken {
-            #expect(coordinator.isCurrent(displayToken, for: .display(CGDirectDisplayID(42))))
+            #expect(coordinator.isCurrent(displayToken, for: .desktop(DesktopKey(displayID: 42))))
         } else {
             Issue.record("Missing display token")
         }
@@ -74,7 +74,7 @@ struct WallpaperRequestCoordinatorTests {
         }
 
         if let displayToken {
-            #expect(coordinator.isCurrent(displayToken, for: .display(CGDirectDisplayID(42))) == false)
+            #expect(coordinator.isCurrent(displayToken, for: .desktop(DesktopKey(displayID: 42))) == false)
         }
 
         firstContinuation?.resume()
@@ -136,7 +136,7 @@ struct WallpaperRequestCoordinatorTests {
             }
         }
 
-        coordinator.start(for: .display(CGDirectDisplayID(7))) { token in
+        coordinator.start(for: .desktop(DesktopKey(displayID: 7))) { token in
             displayToken = token
             await withCheckedContinuation { continuation in
                 secondContinuation = continuation
@@ -145,7 +145,7 @@ struct WallpaperRequestCoordinatorTests {
 
         await Task.yield()
 
-        coordinator.cancel(.display(CGDirectDisplayID(7)))
+        coordinator.cancel(.desktop(DesktopKey(displayID: 7)))
 
         if let allDesktopsToken {
             #expect(coordinator.isCurrent(allDesktopsToken, for: .allDesktops))
@@ -154,13 +154,37 @@ struct WallpaperRequestCoordinatorTests {
         }
 
         if let displayToken {
-            #expect(coordinator.isCurrent(displayToken, for: .display(CGDirectDisplayID(7))) == false)
+            #expect(coordinator.isCurrent(displayToken, for: .desktop(DesktopKey(displayID: 7))) == false)
         } else {
             Issue.record("Missing display token")
         }
 
         firstContinuation?.resume()
         secondContinuation?.resume()
+        await Task.yield()
+    }
+
+    @Test @MainActor func aRequestOnOneSpaceLeavesAnotherSpaceOfTheDisplayRunning() async {
+        let coordinator = WallpaperRequestCoordinator()
+        let spaceA = WallpaperAssignmentTarget.desktop(DesktopKey(displayID: 7, spaceID: 1))
+        let spaceB = WallpaperAssignmentTarget.desktop(DesktopKey(displayID: 7, spaceID: 2))
+        var tokenA: UUID?
+        var continuationA: CheckedContinuation<Void, Never>?
+
+        coordinator.start(for: spaceA) { token in
+            tokenA = token
+            await withCheckedContinuation { continuationA = $0 }
+        }
+        await Task.yield()
+        coordinator.start(for: spaceB) { _ in }
+        await Task.yield()
+
+        if let tokenA {
+            #expect(coordinator.isCurrent(tokenA, for: spaceA))
+        } else {
+            Issue.record("Space A operation never ran")
+        }
+        continuationA?.resume()
         await Task.yield()
     }
 }

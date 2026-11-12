@@ -35,6 +35,11 @@ A video that cannot be loaded or played, and a GIF ImageIO rejects, reach `Wallp
 | Request cancellation | `WallpaperRequestCoordinator` | The newest user choice wins; stale YouTube and Photos results are canceled or ignored     |
 | Serialization        | `AsyncSerialGate`             | FIFO async mutex that serializes downloads                                                |
 
+A saved playback position belongs to the file that was playing: assigning a different file to a desktop drops it.
+Saved wallpapers carry the display UUID (schema v2) beside the display ID, because a display ID can change across a restart; loading maps the UUID back to the connected display's current ID.
+Requests are keyed by desktop: in Per Desktop mode each Space of a display is its own target, so a request on one Space does not cancel another Space's download.
+Launch-time cache cleanup skips files modified after launch, which belong to work the session already started.
+
 `WallpaperState` and the `WallpaperMode`, `DesktopKey` and `WallpaperFileType` types in `sources/WallpaperTypes.swift` hold the model; `AppPaths` resolves the cache and support directories; `Log` wraps unified logging.
 
 ## Sources
@@ -43,6 +48,7 @@ A video that cannot be loaded or played, and a GIF ImageIO rejects, reach `Wallp
   A download reports its fraction to a per-call progress handler and `nil` when it ends, so the overlay follows the display the download is for; `cancel()` stops the running download only.
   A subprocess run ends when the process has exited and stderr has reached its end, joined by a `DispatchGroup` with no blocking wait; a launch failure settles both itself, because neither event arrives for a process that never started.
 - Photos: `PhotosPickerController` wraps `PHPickerViewController`, and the stateless `PhotosService` picks a random video for Shuffle and returns a typed `PhotosShuffleFailure` otherwise; the picker never returns a cache path when the file copy failed.
+  A shuffle export writes to a file of its own and moves it into place, so a file at the cache path is always complete; canceling resumes the export-session wait itself, because PhotoKit promises a cancel callback only for image requests.
 - Files: `.mp4`, `.mov`, `.m4v` and `.gif`, chosen through the status menu.
 - `videos/` ships sample wallpapers for trying the app.
 
@@ -50,7 +56,9 @@ A video that cannot be loaded or played, and a GIF ImageIO rejects, reach `Wallp
 
 `StatusBarController` builds the menu from `MenuSnapshot`, so tests cover labels without launching the wallpaper app.
 `MenuBarIcon` supplies the app's own icon at menu-bar size and `MenuBarLabelFormatter` formats item titles.
-`OpenAtLogin` manages the login item, and `MovingPaperUpdater` drives Sparkle with every entry point foregrounding the accessory app and returning it to accessory on finish.
+`OpenAtLogin` manages the login item; a login item waiting on approval shows `Allow Open at Login…` and opens the Login Items settings, because registering again fails until the user approves it.
+`MovingPaperUpdater` drives Sparkle; every entry point holds the `.updater` presentation reason once per session and the session finish ends it.
+Opening the app while it runs starts a Dock session: a Dock icon whose menu is the status menu without Quit, ended when the status menu closes.
 The menu is rebuilt each time it opens, so it reads `canCheckForUpdates` and the download fraction directly; nothing publishes them.
 `MovingPaperApp` keeps a hidden `Settings { EmptyView() }` scene for lifecycle only and replaces `.appSettings` with an empty command group.
 `AppIdentity` carries the production bundle identifier `com.8bittts.movingpaper`, and `AppIdentityDefaultsMigration` migrates defaults written under earlier identities.

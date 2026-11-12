@@ -9,19 +9,24 @@ struct WallpaperRedownloadRequest: Equatable {
     let localURL: URL
 }
 
-/// One on-disk wallpaper record. Keys are schema v1 (`displayID`, `spaceID`,
-/// `path`, optional `youtubeURL`) and must stay stable unless `currentSchemaVersion` bumps.
+/// One on-disk wallpaper record. Schema v1 keys are `displayID`, `spaceID`,
+/// `path` and optional `youtubeURL`; v2 adds optional `displayUUID`, which
+/// survives a restart where `displayID` may not. Keys must stay stable unless
+/// `currentSchemaVersion` bumps. `displayID` is still written, so an older build
+/// can read a v2 record.
 struct WallpaperPersistedRecord: Equatable {
     var displayID: CGDirectDisplayID
     var spaceID: UInt64
     var path: String
     var youtubeURL: String?
+    var displayUUID: String?
 
-    init(key: DesktopKey, path: String, youtubeURL: String?) {
+    init(key: DesktopKey, path: String, youtubeURL: String?, displayUUID: String? = nil) {
         self.displayID = key.displayID
         self.spaceID = key.spaceID
         self.path = path
         self.youtubeURL = youtubeURL
+        self.displayUUID = displayUUID
     }
 
     init?(plistObject: [String: Any]) {
@@ -36,6 +41,7 @@ struct WallpaperPersistedRecord: Equatable {
         self.spaceID = spaceIDNum.uint64Value
         self.path = path
         self.youtubeURL = plistObject["youtubeURL"] as? String
+        self.displayUUID = plistObject["displayUUID"] as? String
     }
 
     var key: DesktopKey {
@@ -50,6 +56,9 @@ struct WallpaperPersistedRecord: Equatable {
         ]
         if let youtubeURL {
             record["youtubeURL"] = youtubeURL
+        }
+        if let displayUUID {
+            record["displayUUID"] = displayUUID
         }
         return record
     }
@@ -79,17 +88,38 @@ struct WallpaperPersistenceStore {
 
     /// Bump this when the on-disk schema for any of the persisted keys changes,
     /// and add a migration step in `runMigrationsIfNeeded`.
-    static let currentSchemaVersion = 1
+    static let currentSchemaVersion = 2
 
     private let userDefaults: UserDefaults
     private let fileExists: (String) -> Bool
+    private let displayIdentity: DisplayIdentity
 
     init(
         userDefaults: UserDefaults = .standard,
-        fileExists: @escaping (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
+        fileExists: @escaping (String) -> Bool = { FileManager.default.fileExists(atPath: $0) },
+        displayIdentity: DisplayIdentity = .system
     ) {
         self.userDefaults = userDefaults
         self.fileExists = fileExists
+        self.displayIdentity = displayIdentity
+    }
+
+    private func record(key: DesktopKey, path: URL, youtubeURL: String?) -> [String: Any] {
+        WallpaperPersistedRecord(
+            key: key,
+            path: path.path(percentEncoded: false),
+            youtubeURL: youtubeURL,
+            displayUUID: displayIdentity.uuid(key.displayID)
+        ).plistObject()
+    }
+
+    /// The record's key on this boot: its display UUID mapped to the display's
+    /// current ID when that display is connected, else the saved ID.
+    private func currentKey(for record: WallpaperPersistedRecord) -> DesktopKey {
+        guard let uuid = record.displayUUID,
+              let displayID = displayIdentity.connectedDisplayID(uuid)
+        else { return record.key }
+        return DesktopKey(displayID: displayID, spaceID: record.spaceID)
     }
 
     /// Runs any pending schema migrations and stamps the current version. Safe
@@ -100,8 +130,10 @@ struct WallpaperPersistenceStore {
         let saved = userDefaults.integer(forKey: Defaults.schemaVersion)
         guard saved < Self.currentSchemaVersion else { return }
 
-        // Future migrations slot in here, ordered from low version to high.
-        // e.g. `if saved < 2 { migrateToV2() }`
+        // Migrations run in order, from low version to high.
+        // v1 → v2: v1 records carry no `displayUUID`. They need no rewrite: `load`
+        // keys a record without one by its saved `displayID`, and the next save
+        // adds the UUID.
 
         userDefaults.set(Self.currentSchemaVersion, forKey: Defaults.schemaVersion)
     }
@@ -113,24 +145,14 @@ struct WallpaperPersistenceStore {
         pendingRedownloads: [WallpaperRedownloadRequest] = []
     ) {
         var encoded: [[String: Any]] = state.entries.map { key, entry in
-            WallpaperPersistedRecord(
-                key: key,
-                path: entry.localURL.path(percentEncoded: false),
-                youtubeURL: entry.youtubeOrigin
-            ).plistObject()
+            record(key: key, path: entry.localURL, youtubeURL: entry.youtubeOrigin)
         }
 
         // Re-emit still-pending YouTube redownloads (cache file missing, not yet
         // resolved) so an unrelated save during the redownload window doesn't
         // erase them. Skip any key the user has since assigned directly.
         for request in pendingRedownloads where state.entries[request.key] == nil {
-            encoded.append(
-                WallpaperPersistedRecord(
-                    key: request.key,
-                    path: request.localURL.path(percentEncoded: false),
-                    youtubeURL: request.youtubeURL
-                ).plistObject()
-            )
+            encoded.append(record(key: request.key, path: request.localURL, youtubeURL: request.youtubeURL))
         }
 
         userDefaults.set(encoded, forKey: Defaults.desktopFiles)
@@ -157,7 +179,7 @@ struct WallpaperPersistenceStore {
                 continue
             }
 
-            let key = parsed.key
+            let key = currentKey(for: parsed)
             if !key.isAllDesktops {
                 persisted.state.knownSpaces[key.displayID, default: []].insert(key.spaceID)
             }

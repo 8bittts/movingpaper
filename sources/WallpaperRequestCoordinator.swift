@@ -2,8 +2,12 @@ import CoreGraphics
 import Foundation
 
 enum WallpaperAssignmentTarget: Hashable {
+    /// Every display at once.
     case allDesktops
-    case display(CGDirectDisplayID)
+    /// One desktop: a display in All Desktops mode (the sentinel Space), or one
+    /// Space of a display in Per Desktop mode. A request on one Space must not
+    /// cancel a request still running for another Space of the same display.
+    case desktop(DesktopKey)
 }
 
 @MainActor

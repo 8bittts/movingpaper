@@ -84,12 +84,10 @@ struct ManagedDisplaySpacesSnapshot: Equatable {
             screens.compactMap { screen -> (String, CGDirectDisplayID)? in
                 guard
                     let displayID = screen.displayID,
-                    let uuid = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue()
+                    let identifier = DisplayIdentity.systemUUID(for: displayID)
                 else {
                     return nil
                 }
-
-                let identifier = CFUUIDCreateString(nil, uuid) as String
                 return (identifier, displayID)
             },
             // Two screens reporting the same display UUID would otherwise trap.

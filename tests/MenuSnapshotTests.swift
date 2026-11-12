@@ -130,13 +130,21 @@ struct MenuSnapshotTests {
 
     @Test func footerPutsAboutAndOpenAtLoginNextToUpdates() {
         var input = baseInput()
-        input.openAtLogin = true
+        input.loginItem = .enabled
         let rows = MenuSnapshot.rows(from: input)
         #expect(containsCommand(rows, id: .about, title: "About MovingPaper"))
         let login = firstCommand(rows, id: .toggleOpenAtLogin)
         #expect(login?.title == "Open at Login")
         #expect(login?.checked == true)
         #expect(commandTitles(rows).contains("Built with YEN") == false)
+    }
+
+    @Test func aLoginItemAwaitingApprovalPointsToSystemSettings() {
+        var input = baseInput()
+        input.loginItem = .requiresApproval
+        let login = firstCommand(MenuSnapshot.rows(from: input), id: .toggleOpenAtLogin)
+        #expect(login?.title == "Allow Open at Login…")
+        #expect(login?.checked == false)
     }
 
     @Test func mutedStateOffersTurnSoundOn() {
@@ -252,7 +260,7 @@ struct MenuSnapshotTests {
             hasAnyWallpaper: false,
             sharedFileName: nil,
             canCheckForUpdates: true,
-            openAtLogin: false,
+            loginItem: .disabled,
             displays: []
         )
     }

@@ -15,10 +15,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Evict stale cache entries off the main path; safe to drop if canceled.
         // Protect files the restored wallpapers still reference so an eviction
         // can't blank a live desktop.
+        // Files written after launch belong to work this session started (a
+        // restore redownload, a shuffle export), so the cleanup leaves them alone.
         let protectedPaths = manager.referencedLocalPaths
+        let launchDate = Date()
         Task.detached(priority: .utility) {
-            CacheJanitor.enforceDefaultPolicies(protecting: protectedPaths)
-            CacheJanitor.pruneUnreferencedPhotosCaches(referencedPaths: protectedPaths)
+            CacheJanitor.enforceDefaultPolicies(protecting: protectedPaths, modifiedBefore: launchDate)
+            CacheJanitor.pruneUnreferencedPhotosCaches(referencedPaths: protectedPaths, modifiedBefore: launchDate)
         }
 
         let sparkleUpdater = MovingPaperUpdater()

@@ -23,6 +23,7 @@ enum CacheJanitor {
         directory: URL,
         budgetBytes: Int64,
         protectedPaths: Set<String> = [],
+        modifiedBefore cutoff: Date = .distantFuture,
         fileManager: FileManager = .default
     ) -> Int {
         guard let entries = try? fileManager.contentsOfDirectory(
@@ -61,6 +62,8 @@ enum CacheJanitor {
             // Never evict a file that is currently referenced by a live wallpaper —
             // dropping it would blank the desktop until the next launch redownload.
             if protectedResolved.contains(resolvedPath(candidate.url)) { continue }
+            // A file written after the cutoff may belong to work still running.
+            if candidate.modified >= cutoff { continue }
             do {
                 try fileManager.removeItem(at: candidate.url)
                 remaining -= candidate.size
@@ -76,11 +79,14 @@ enum CacheJanitor {
 
     /// Apply the default YouTube cache policy. Safe to call from any actor.
     /// `protectedPaths` are cache files currently referenced by live wallpapers.
-    static func enforceDefaultPolicies(protecting protectedPaths: Set<String> = []) {
+    /// Files modified at or after `cutoff` are kept: the cleanup runs alongside
+    /// downloads and exports the session has already started.
+    static func enforceDefaultPolicies(protecting protectedPaths: Set<String> = [], modifiedBefore cutoff: Date) {
         enforceBudget(
             directory: AppPaths.youtubeCache,
             budgetBytes: defaultYouTubeBudgetBytes,
-            protectedPaths: protectedPaths
+            protectedPaths: protectedPaths,
+            modifiedBefore: cutoff
         )
     }
 
@@ -94,11 +100,12 @@ enum CacheJanitor {
     static func pruneUnreferenced(
         directory: URL,
         referencedPaths: Set<String>,
+        modifiedBefore cutoff: Date = .distantFuture,
         fileManager: FileManager = .default
     ) -> Int {
         guard let entries = try? fileManager.contentsOfDirectory(
             at: directory,
-            includingPropertiesForKeys: nil,
+            includingPropertiesForKeys: [.contentModificationDateKey],
             options: [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else {
             return 0
@@ -108,6 +115,9 @@ enum CacheJanitor {
 
         var deleted = 0
         for url in entries where !referencedResolved.contains(resolvedPath(url)) {
+            // A file written after the cutoff may be an export still in progress.
+            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            guard let modified, modified < cutoff else { continue }
             if (try? fileManager.removeItem(at: url)) != nil { deleted += 1 }
         }
         return deleted
@@ -121,8 +131,8 @@ enum CacheJanitor {
 
     /// Prune orphaned Photos picker/shuffle cache files not referenced by a live
     /// wallpaper. Safe to call from any actor.
-    static func pruneUnreferencedPhotosCaches(referencedPaths: Set<String>) {
-        pruneUnreferenced(directory: AppPaths.photosPickerCache, referencedPaths: referencedPaths)
-        pruneUnreferenced(directory: AppPaths.photosShuffleCache, referencedPaths: referencedPaths)
+    static func pruneUnreferencedPhotosCaches(referencedPaths: Set<String>, modifiedBefore cutoff: Date) {
+        pruneUnreferenced(directory: AppPaths.photosPickerCache, referencedPaths: referencedPaths, modifiedBefore: cutoff)
+        pruneUnreferenced(directory: AppPaths.photosShuffleCache, referencedPaths: referencedPaths, modifiedBefore: cutoff)
     }
 }

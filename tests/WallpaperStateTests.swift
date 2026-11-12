@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreMedia
 import Foundation
 import Testing
 @testable import MovingPaper
@@ -60,6 +61,49 @@ struct WallpaperStateTests {
         // knownSpaces is intentionally NOT pruned — we still want to show the
         // Space in the menu even after the user removes its wallpaper.
         #expect(state.knownSpaces[displayA] == Set([5]))
+    }
+
+    @Test func aNewFileDropsTheOldFilesPlaybackPosition() {
+        var state = WallpaperState()
+        let key = DesktopKey(displayID: displayA, spaceID: 5)
+        let other = URL(filePath: "/tmp/movingpaper-state-tests/other.mp4")
+        state.setEntry(WallpaperEntry(localURL: localURL, youtubeOrigin: nil), for: key)
+        state.playbackPositions[key] = CMTime(seconds: 42, preferredTimescale: 600)
+
+        state.setEntry(WallpaperEntry(localURL: localURL, youtubeOrigin: "https://youtu.be/x"), for: key)
+        #expect(state.playbackPositions[key] != nil)
+
+        state.setEntry(WallpaperEntry(localURL: other, youtubeOrigin: nil), for: key)
+        #expect(state.playbackPositions[key] == nil)
+    }
+
+    @Test func applySharedKeepsPositionsOnlyWhereTheFileStays() {
+        var state = WallpaperState()
+        let keyA = DesktopKey(displayID: displayA)
+        let keyB = DesktopKey(displayID: displayB)
+        let other = URL(filePath: "/tmp/movingpaper-state-tests/other.mp4")
+        state.applyShared(entry: WallpaperEntry(localURL: localURL, youtubeOrigin: nil), across: [displayA, displayB])
+        state.playbackPositions[keyA] = CMTime(seconds: 7, preferredTimescale: 600)
+
+        state.applyShared(entry: WallpaperEntry(localURL: localURL, youtubeOrigin: nil), across: [displayA])
+        #expect(state.playbackPositions[keyA] != nil)
+        #expect(state.entries[keyB] == nil)
+
+        state.applyShared(entry: WallpaperEntry(localURL: other, youtubeOrigin: nil), across: [displayA])
+        #expect(state.playbackPositions[keyA] == nil)
+    }
+
+    @Test func migrateToPerDesktopCarriesThePlaybackPosition() {
+        var state = WallpaperState()
+        let oldKey = DesktopKey(displayID: displayA)
+        let time = CMTime(seconds: 3, preferredTimescale: 600)
+        state.applyShared(entry: WallpaperEntry(localURL: localURL, youtubeOrigin: nil), across: [displayA])
+        state.playbackPositions[oldKey] = time
+
+        state.migrateToPerDesktop { _ in 9 }
+
+        #expect(state.playbackPositions[DesktopKey(displayID: displayA, spaceID: 9)] == time)
+        #expect(state.playbackPositions[oldKey] == nil)
     }
 
     @Test func applySharedClearsExistingEntriesAndPinsToEveryDisplay() {

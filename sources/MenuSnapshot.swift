@@ -11,7 +11,7 @@ struct MenuModelInput: Equatable {
     var hasAnyWallpaper: Bool
     var sharedFileName: String?
     var canCheckForUpdates: Bool
-    var openAtLogin: Bool
+    var loginItem: LoginItemStatus
     var displays: [DisplayMenuInput]
 }
 
@@ -214,6 +214,19 @@ enum MenuSnapshot {
         return rows
     }
 
+    /// A login item waiting on approval opens System Settings, so its title
+    /// names that step and ends in an ellipsis.
+    private static func loginItemCommand(_ status: LoginItemStatus) -> MenuCommand {
+        switch status {
+        case .enabled:
+            MenuCommand(title: "Open at Login", id: .toggleOpenAtLogin, checked: true)
+        case .disabled:
+            MenuCommand(title: "Open at Login", id: .toggleOpenAtLogin)
+        case .requiresApproval:
+            MenuCommand(title: "Allow Open at Login…", id: .toggleOpenAtLogin)
+        }
+    }
+
     private static func footerRows(from input: MenuModelInput) -> [MenuRow] {
         [
             .command(MenuCommand(title: "About MovingPaper", id: .about)),
@@ -222,11 +235,7 @@ enum MenuSnapshot {
                 id: .checkForUpdates,
                 enabled: input.canCheckForUpdates
             )),
-            .command(MenuCommand(
-                title: "Open at Login",
-                id: .toggleOpenAtLogin,
-                checked: input.openAtLogin
-            )),
+            .command(loginItemCommand(input.loginItem)),
             .separator,
             .command(MenuCommand(title: "Quit MovingPaper", id: .quit, keyEquivalent: "q")),
         ]

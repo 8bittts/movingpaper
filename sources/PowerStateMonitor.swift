@@ -15,6 +15,10 @@ final class PowerStateMonitor {
 
     /// Begin observing. Emits the current verdict immediately.
     func start() {
+        // Apple: "To receive thermalStateDidChangeNotification, you must access
+        // the thermalState property prior to registering for the notification."
+        // `shouldPause` skips the read while Low Power Mode is on, so read it here.
+        _ = ProcessInfo.processInfo.thermalState
         observers = [
             Notification.Name.NSProcessInfoPowerStateDidChange,
             ProcessInfo.thermalStateDidChangeNotification,

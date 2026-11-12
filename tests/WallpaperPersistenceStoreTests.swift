@@ -3,6 +3,11 @@ import Foundation
 import Testing
 @testable import MovingPaper
 
+extension DisplayIdentity {
+    /// No display has a UUID, so records keep their saved display IDs.
+    static let none = DisplayIdentity(uuid: { _ in nil }, connectedDisplayID: { _ in nil })
+}
+
 struct WallpaperPersistenceStoreTests {
 
     @Test func savesAndLoadsExistingAssignments() throws {
@@ -13,7 +18,7 @@ struct WallpaperPersistenceStoreTests {
         FileManager.default.createFile(atPath: wallpaperURL.path(percentEncoded: false), contents: Data())
 
         let key = DesktopKey(displayID: 99, spaceID: 42)
-        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults)
+        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults, displayIdentity: .none)
 
         var state = WallpaperState()
         state.setEntry(
@@ -44,7 +49,7 @@ struct WallpaperPersistenceStoreTests {
         defer { defaults.cleanup() }
 
         let missingPath = defaults.directory.appendingPathComponent("missing.mp4").path(percentEncoded: false)
-        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults)
+        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults, displayIdentity: .none)
         defaults.userDefaults.set("perDesktop", forKey: "wallpaperMode")
         defaults.userDefaults.set(false, forKey: "isMuted")
         defaults.userDefaults.set(
@@ -77,7 +82,7 @@ struct WallpaperPersistenceStoreTests {
         defer { defaults.cleanup() }
 
         let missingPath = defaults.directory.appendingPathComponent("gone.mp4").path(percentEncoded: false)
-        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults)
+        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults, displayIdentity: .none)
         defaults.userDefaults.set(
             [[
                 "displayID": NSNumber(value: CGDirectDisplayID(7)),
@@ -112,7 +117,7 @@ struct WallpaperPersistenceStoreTests {
         let realURL = defaults.directory.appendingPathComponent("resolved.mp4")
         FileManager.default.createFile(atPath: realURL.path(percentEncoded: false), contents: Data())
         let key = DesktopKey(displayID: 7, spaceID: 3)
-        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults)
+        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults, displayIdentity: .none)
 
         // The redownload has resolved: the key now has a real entry.
         var state = WallpaperState()
@@ -135,7 +140,7 @@ struct WallpaperPersistenceStoreTests {
         let defaults = try temporaryDefaults()
         defer { defaults.cleanup() }
 
-        let loaded = WallpaperPersistenceStore(userDefaults: defaults.userDefaults).load()
+        let loaded = WallpaperPersistenceStore(userDefaults: defaults.userDefaults, displayIdentity: .none).load()
         #expect(loaded.mode == .allDesktops)
         #expect(loaded.isMuted)
         #expect(loaded.state.entries.isEmpty)
@@ -148,7 +153,7 @@ struct WallpaperPersistenceStoreTests {
         defer { defaults.cleanup() }
 
         #expect(defaults.userDefaults.integer(forKey: "persistenceSchemaVersion") == 0)
-        _ = WallpaperPersistenceStore(userDefaults: defaults.userDefaults).load()
+        _ = WallpaperPersistenceStore(userDefaults: defaults.userDefaults, displayIdentity: .none).load()
         #expect(
             defaults.userDefaults.integer(forKey: "persistenceSchemaVersion")
                 == WallpaperPersistenceStore.currentSchemaVersion
@@ -160,7 +165,7 @@ struct WallpaperPersistenceStoreTests {
         defer { defaults.cleanup() }
 
         let missingPath = defaults.directory.appendingPathComponent("gone.mp4").path(percentEncoded: false)
-        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults)
+        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults, displayIdentity: .none)
         defaults.userDefaults.set(
             [[
                 "displayID": NSNumber(value: CGDirectDisplayID(5)),
@@ -206,7 +211,7 @@ struct WallpaperPersistenceStoreTests {
 
         let goodURL = defaults.directory.appendingPathComponent("good.mp4")
         FileManager.default.createFile(atPath: goodURL.path(percentEncoded: false), contents: Data())
-        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults)
+        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults, displayIdentity: .none)
         defaults.userDefaults.set(
             [
                 // Malformed: missing "path" → skipped via `guard ... else { continue }`.
@@ -228,6 +233,91 @@ struct WallpaperPersistenceStoreTests {
         #expect(loaded.state.entries == [
             DesktopKey(displayID: 2, spaceID: 0): WallpaperEntry(localURL: goodURL, youtubeOrigin: nil),
         ])
+    }
+
+    /// One display whose ID changed across a restart: saved as 5, now 7.
+    private static let restartedDisplay = DisplayIdentity(
+        uuid: { $0 == 5 || $0 == 7 ? "UUID-A" : nil },
+        connectedDisplayID: { $0 == "UUID-A" ? 7 : nil }
+    )
+
+    @Test func v1RecordsLoadByDisplayIDAndGainADisplayUUIDOnTheNextSave() throws {
+        let defaults = try temporaryDefaults()
+        defer { defaults.cleanup() }
+
+        let wallpaperURL = defaults.directory.appendingPathComponent("v1.mp4")
+        FileManager.default.createFile(atPath: wallpaperURL.path(percentEncoded: false), contents: Data())
+        defaults.userDefaults.set(1, forKey: "persistenceSchemaVersion")
+        defaults.userDefaults.set(
+            [[
+                "displayID": NSNumber(value: CGDirectDisplayID(5)),
+                "spaceID": NSNumber(value: UInt64(3)),
+                "path": wallpaperURL.path(percentEncoded: false),
+            ]],
+            forKey: "desktopFiles"
+        )
+        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults, displayIdentity: Self.restartedDisplay)
+
+        let loaded = store.load()
+        let key = DesktopKey(displayID: 5, spaceID: 3)
+        #expect(loaded.state.entries[key]?.localURL == wallpaperURL)
+        #expect(defaults.userDefaults.integer(forKey: "persistenceSchemaVersion") == 2)
+
+        store.save(mode: loaded.mode, isMuted: loaded.isMuted, state: loaded.state)
+        let saved = defaults.userDefaults.array(forKey: "desktopFiles") as? [[String: Any]]
+        #expect(saved?.first?["displayUUID"] as? String == "UUID-A")
+        #expect(saved?.first?["displayID"] as? NSNumber == NSNumber(value: CGDirectDisplayID(5)))
+    }
+
+    @Test func aDisplayWhoseIDChangedAfterARestartKeepsItsWallpaper() throws {
+        let defaults = try temporaryDefaults()
+        defer { defaults.cleanup() }
+
+        let wallpaperURL = defaults.directory.appendingPathComponent("v2.mp4")
+        FileManager.default.createFile(atPath: wallpaperURL.path(percentEncoded: false), contents: Data())
+        defaults.userDefaults.set(2, forKey: "persistenceSchemaVersion")
+        defaults.userDefaults.set(
+            [[
+                "displayID": NSNumber(value: CGDirectDisplayID(5)),
+                "spaceID": NSNumber(value: UInt64(3)),
+                "path": wallpaperURL.path(percentEncoded: false),
+                "displayUUID": "UUID-A",
+            ]],
+            forKey: "desktopFiles"
+        )
+
+        let loaded = WallpaperPersistenceStore(
+            userDefaults: defaults.userDefaults,
+            displayIdentity: Self.restartedDisplay
+        ).load()
+
+        #expect(loaded.state.entries.keys.map { $0 } == [DesktopKey(displayID: 7, spaceID: 3)])
+        #expect(loaded.state.knownSpaces[7] == Set([3]))
+        #expect(loaded.state.knownSpaces[5] == nil)
+    }
+
+    @Test func aDisconnectedDisplayKeepsItsSavedID() throws {
+        let defaults = try temporaryDefaults()
+        defer { defaults.cleanup() }
+
+        let wallpaperURL = defaults.directory.appendingPathComponent("away.mp4")
+        FileManager.default.createFile(atPath: wallpaperURL.path(percentEncoded: false), contents: Data())
+        defaults.userDefaults.set(
+            [[
+                "displayID": NSNumber(value: CGDirectDisplayID(9)),
+                "spaceID": NSNumber(value: UInt64(0)),
+                "path": wallpaperURL.path(percentEncoded: false),
+                "displayUUID": "UUID-UNPLUGGED",
+            ]],
+            forKey: "desktopFiles"
+        )
+
+        let loaded = WallpaperPersistenceStore(
+            userDefaults: defaults.userDefaults,
+            displayIdentity: Self.restartedDisplay
+        ).load()
+
+        #expect(loaded.state.entries[DesktopKey(displayID: 9)]?.localURL == wallpaperURL)
     }
 
     private func temporaryDefaults() throws -> TemporaryDefaults {

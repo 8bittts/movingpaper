@@ -102,7 +102,7 @@ final class WallpaperManager {
     // MARK: - Menu
 
     /// Snapshot the status menu needs without exposing the downloader.
-    func menuInput(canCheckForUpdates: Bool, openAtLogin: Bool) -> MenuModelInput {
+    func menuInput(canCheckForUpdates: Bool, loginItem: LoginItemStatus) -> MenuModelInput {
         MenuModelInput(
             downloadProgress: youtubeDownloader.progress,
             mode: mode,
@@ -111,7 +111,7 @@ final class WallpaperManager {
             hasAnyWallpaper: !state.isEmpty,
             sharedFileName: mode == .allDesktops ? state.sharedLocalURL?.lastPathComponent : nil,
             canCheckForUpdates: canCheckForUpdates,
-            openAtLogin: openAtLogin,
+            loginItem: loginItem,
             displays: NSScreen.screens.compactMap { screen in
                 screen.displayID.map { displayID in
                     DisplayMenuInput(
@@ -146,7 +146,7 @@ final class WallpaperManager {
     // MARK: - Request Cancellation
 
     private func assignmentTarget(for displayID: CGDirectDisplayID?) -> WallpaperAssignmentTarget {
-        displayID.map { .display($0) } ?? .allDesktops
+        displayID.map { .desktop(desktopKey(for: $0)) } ?? .allDesktops
     }
 
     /// Cancelling the restore Task propagates through `withTaskCancellationHandler`
@@ -318,7 +318,7 @@ final class WallpaperManager {
 
     /// Remove wallpaper from a specific display (current space in perDesktop mode).
     func clearWallpaper(for displayID: CGDirectDisplayID) {
-        cancelAssignment(for: .display(displayID))
+        cancelAssignment(for: assignmentTarget(for: displayID))
         let key = desktopKey(for: displayID)
         pendingRedownloads[key] = nil
         state.clearEntry(for: key)
@@ -330,9 +330,11 @@ final class WallpaperManager {
     func clearAllWallpapers() {
         cancelAllRequests()
         pendingRedownloads.removeAll()
+        // Close the windows first: closing saves their playback positions,
+        // which must not outlive the wallpapers they belong to.
+        tearDownWindows()
         state.entries.removeAll()
         state.playbackPositions.removeAll()
-        tearDownWindows()
         saveState()
     }
 

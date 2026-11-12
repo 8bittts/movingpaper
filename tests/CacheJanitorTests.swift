@@ -101,6 +101,40 @@ struct CacheJanitorTests {
         #expect(!FileManager.default.fileExists(atPath: fixture.path(for: "orphan-b.mp4")))
     }
 
+    @Test func pruneUnreferencedKeepsFilesWrittenAfterTheCutoff() throws {
+        let fixture = try CacheFixture()
+        defer { fixture.cleanup() }
+
+        try fixture.write(name: "old-orphan.mp4", size: 10, modified: -100)
+        try fixture.write(name: "export-in-progress.partial.mp4", size: 10, modified: 0)
+
+        let deleted = CacheJanitor.pruneUnreferenced(
+            directory: fixture.directory,
+            referencedPaths: [],
+            modifiedBefore: Date(timeIntervalSinceNow: -10)
+        )
+
+        #expect(deleted == 1)
+        #expect(FileManager.default.fileExists(atPath: fixture.path(for: "export-in-progress.partial.mp4")))
+    }
+
+    @Test func budgetEvictionKeepsFilesWrittenAfterTheCutoff() throws {
+        let fixture = try CacheFixture()
+        defer { fixture.cleanup() }
+
+        try fixture.write(name: "old.mp4", size: 100, modified: -100)
+        try fixture.write(name: "downloading.mp4", size: 100, modified: 0)
+
+        let deleted = CacheJanitor.enforceBudget(
+            directory: fixture.directory,
+            budgetBytes: 50,
+            modifiedBefore: Date(timeIntervalSinceNow: -10)
+        )
+
+        #expect(deleted == 1)
+        #expect(FileManager.default.fileExists(atPath: fixture.path(for: "downloading.mp4")))
+    }
+
     @Test func missingDirectoryIsHandledGracefully() {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("MovingPaperTests-missing-\(UUID().uuidString)", isDirectory: true)

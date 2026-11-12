@@ -91,15 +91,32 @@ final class VideoWallpaperView: NSView, WallpaperContentView {
     }
 
     private func install(asset: AVURLAsset, url: URL, resumeTime: CMTime?) {
-        let queuePlayer = AVQueuePlayer()
-        queuePlayer.isMuted = isMuted
-        queuePlayer.preventsDisplaySleepDuringVideoPlayback = false
+        let queuePlayer = makePlayer()
         let playerLooper = AVPlayerLooper(player: queuePlayer, templateItem: AVPlayerItem(asset: asset))
 
+        attach(queuePlayer, url: url)
+        looper = playerLooper
+        looperObserver = playerLooper.publisher(for: \.status)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] status in
+                if status == .failed {
+                    self?.enableRewindFallback(asset: asset, url: url)
+                }
+            }
+
+        start(at: resumeTime)
+    }
+
+    private func makePlayer(items: [AVPlayerItem] = []) -> AVQueuePlayer {
+        let queuePlayer = AVQueuePlayer(items: items)
+        queuePlayer.isMuted = isMuted
+        queuePlayer.preventsDisplaySleepDuringVideoPlayback = false
+        return queuePlayer
+    }
+
+    private func attach(_ queuePlayer: AVQueuePlayer, url: URL) {
         playerLayer.player = queuePlayer
         player = queuePlayer
-        looper = playerLooper
-
         statusObserver = queuePlayer.publisher(for: \.status)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] status in
@@ -113,14 +130,9 @@ final class VideoWallpaperView: NSView, WallpaperContentView {
                     break
                 }
             }
-        looperObserver = playerLooper.publisher(for: \.status)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] status in
-                if status == .failed {
-                    self?.enableRewindFallback()
-                }
-            }
+    }
 
+    private func start(at resumeTime: CMTime?) {
         if let resumeTime, resumeTime.isValid, resumeTime.seconds > 0.1 {
             // Playback starts once the ready player has seeked there.
             pendingResumeTime = resumeTime
@@ -147,21 +159,34 @@ final class VideoWallpaperView: NSView, WallpaperContentView {
         player?.play()
     }
 
-    private func enableRewindFallback() {
+    /// Apple: a looper whose status is `.failed` can no longer be used for
+    /// playback. Replace it with a fresh player that holds one item, stays on it
+    /// at the end (`actionAtItemEnd = .none`), and rewinds that item only.
+    private func enableRewindFallback(asset: AVURLAsset, url: URL) {
         guard endObserver == nil else { return }
         Log.playback.error("AVPlayerLooper failed; falling back to rewind-at-end")
+        let resumeTime = playbackTime
+        looperObserver = nil
+        looper?.disableLooping()
+        looper = nil
+        player?.pause()
+
+        let item = AVPlayerItem(asset: asset)
+        let fallback = makePlayer(items: [item])
+        fallback.actionAtItemEnd = .none
+        attach(fallback, url: url)
         endObserver = NotificationCenter.default.addObserver(
             forName: AVPlayerItem.didPlayToEndTimeNotification,
-            object: nil,
+            object: item,
             queue: .main
-        ) { [weak self] notification in
-            let ending = notification.object as? AVPlayerItem
+        ) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, let ending, self.player?.currentItem === ending else { return }
+                guard let self else { return }
                 self.player?.seek(to: .zero)
                 self.playIfNotPaused()
             }
         }
+        start(at: resumeTime)
     }
 
     private func tearDownPlayback() {

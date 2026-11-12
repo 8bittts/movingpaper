@@ -26,7 +26,7 @@ final class StatusBarController: NSObject {
     private var menuInput: MenuModelInput {
         wallpaperManager.menuInput(
             canCheckForUpdates: updater.canCheckForUpdates,
-            openAtLogin: OpenAtLogin.isEnabled
+            loginItem: OpenAtLogin.status
         )
     }
 
@@ -254,7 +254,7 @@ final class StatusBarController: NSObject {
 
     @objc private func toggleOpenAtLogin() {
         do {
-            try OpenAtLogin.setEnabled(!OpenAtLogin.isEnabled)
+            try OpenAtLogin.toggle()
         } catch {
             AppPresentation.showAlert(
                 title: "Couldn't Update Login Item",

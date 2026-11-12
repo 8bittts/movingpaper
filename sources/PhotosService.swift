@@ -63,6 +63,7 @@ enum PhotosService {
         }
 
         for attempt in 0..<3 {
+            guard !Task.isCancelled else { return .failed(.exportFailed) }
             let index = Int.random(in: 0..<allVideos.count)
             if let url = await exportVideo(asset: allVideos.object(at: index)) {
                 return .video(url)
@@ -78,6 +79,8 @@ enum PhotosService {
 
         let destURL = cacheDir.appendingPathComponent("\(asset.localIdentifier.replacingOccurrences(of: "/", with: "-")).mp4")
 
+        // Only a finished export is ever moved to `destURL`, so an existing file
+        // there is complete.
         if FileManager.default.fileExists(atPath: destURL.path(percentEncoded: false)) {
             return destURL
         }
@@ -91,30 +94,67 @@ enum PhotosService {
 
         guard gotSession, let session = exportSession else { return nil }
 
+        // Export to a file of this run's own, then move it into place. Two
+        // shuffles can pick the same asset; a shared path would let one read the
+        // other's half-written file, or delete it on failure while it plays.
+        let partialURL = cacheDir.appendingPathComponent("\(UUID().uuidString).partial.mp4")
+        defer { try? FileManager.default.removeItem(at: partialURL) }
+
         // Export with a 30s timeout
         nonisolated(unsafe) let sendableSession = session
         let exported = await withTimeout(seconds: 30) {
-            await export(session: sendableSession, to: destURL)
+            await export(session: sendableSession, to: partialURL)
         } ?? false
+        guard exported else { return nil }
 
-        if exported, FileManager.default.fileExists(atPath: destURL.path(percentEncoded: false)) {
-            return destURL
+        do {
+            try FileManager.default.moveItem(at: partialURL, to: destURL)
+        } catch where FileManager.default.fileExists(atPath: destURL.path(percentEncoded: false)) {
+            // Another shuffle finished the same asset first; its file is complete.
+        } catch {
+            Log.photos.error("Couldn't move the shuffle export into the cache: \(error.localizedDescription, privacy: .public)")
+            return nil
         }
-
-        // Clean up partial file on failure
-        try? FileManager.default.removeItem(at: destURL)
-        return nil
+        return destURL
     }
 
-    private static func requestExportSession(for asset: PHAsset) async -> AVAssetExportSession? {
-        // The cancellation handler runs concurrently with the operation, so the
-        // request ID is published through a lock rather than a bare
-        // `nonisolated(unsafe) var` (which would be an unsynchronized read/write race).
-        let requestID = OSAllocatedUnfairLock(initialState: PHInvalidImageRequestID)
-        nonisolated(unsafe) var exportSession: AVAssetExportSession?
+    /// An export session crossing from PhotoKit's callback queue.
+    private struct SessionBox: @unchecked Sendable {
+        let session: AVAssetExportSession?
+    }
 
-        await withTaskCancellationHandler(operation: {
-            await withCheckedContinuation { continuation in
+    /// Shared between the request, PhotoKit's result handler and the
+    /// cancellation handler, which run concurrently.
+    private struct ExportRequestState {
+        var requestID = PHInvalidImageRequestID
+        var cancelled = false
+        var continuation: CheckedContinuation<SessionBox, Never>?
+
+        /// Hand out the continuation at most once, so it is resumed exactly once.
+        mutating func takeContinuation() -> CheckedContinuation<SessionBox, Never>? {
+            defer { continuation = nil }
+            return continuation
+        }
+    }
+
+    /// Cancellation resumes the wait itself. PhotoKit documents a result-handler
+    /// call after cancellation only for image requests, and a continuation that
+    /// is never resumed suspends the shuffle forever.
+    private static func requestExportSession(for asset: PHAsset) async -> AVAssetExportSession? {
+        let state = OSAllocatedUnfairLock(initialState: ExportRequestState())
+
+        let box = await withTaskCancellationHandler(operation: {
+            await withCheckedContinuation { (continuation: CheckedContinuation<SessionBox, Never>) in
+                let alreadyCancelled = state.withLock { state in
+                    if state.cancelled { return true }
+                    state.continuation = continuation
+                    return false
+                }
+                if alreadyCancelled {
+                    continuation.resume(returning: SessionBox(session: nil))
+                    return
+                }
+
                 let reqOptions = PHVideoRequestOptions()
                 reqOptions.isNetworkAccessAllowed = true
                 reqOptions.deliveryMode = .highQualityFormat
@@ -123,20 +163,33 @@ enum PhotosService {
                     forVideo: asset,
                     options: reqOptions,
                     exportPreset: AVAssetExportPresetHighestQuality
-                ) { session, _ in
-                    exportSession = session
-                    continuation.resume()
+                ) { session, info in
+                    if session == nil, let error = info?[PHImageErrorKey] as? Error {
+                        Log.photos.error("Photos export session failed: \(error.localizedDescription, privacy: .public)")
+                    }
+                    state.withLock { $0.takeContinuation() }?.resume(returning: SessionBox(session: session))
                 }
-                requestID.withLock { $0 = id }
+                // A cancel that arrived before the ID existed could not cancel the request.
+                let cancelNow = state.withLock { state in
+                    state.requestID = id
+                    return state.cancelled
+                }
+                if cancelNow {
+                    PHImageManager.default().cancelImageRequest(id)
+                }
             }
         }, onCancel: {
-            let id = requestID.withLock { $0 }
+            let (id, continuation) = state.withLock { state in
+                state.cancelled = true
+                return (state.requestID, state.takeContinuation())
+            }
             if id != PHInvalidImageRequestID {
                 PHImageManager.default().cancelImageRequest(id)
             }
+            continuation?.resume(returning: SessionBox(session: nil))
         })
 
-        return exportSession
+        return box.session
     }
 
     /// Cancelling the calling task cancels the export, so the timeout around
@@ -146,12 +199,20 @@ enum PhotosService {
             try await session.export(to: destURL, as: .mp4)
             return true
         } catch {
+            if !Task.isCancelled {
+                Log.photos.error("Photos export failed: \(error.localizedDescription, privacy: .public)")
+            }
             return false
         }
     }
 }
 
 /// Run an async operation with a timeout. Returns nil if the timeout expires.
+///
+/// A task group waits for every child before it returns, even canceled ones, so
+/// the timeout bounds the wait only because `operation` ends promptly on
+/// cancellation: `requestExportSession` resumes itself and `export(to:as:)`
+/// throws when canceled.
 private func withTimeout<T: Sendable>(seconds: TimeInterval, operation: @escaping @Sendable () async -> T) async -> T? {
     await withTaskGroup(of: T?.self) { group in
         group.addTask { await operation() }
