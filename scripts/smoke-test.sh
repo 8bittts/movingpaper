@@ -179,7 +179,7 @@ grep -q 'scripts/smoke-test.sh" --production' scripts/release-movingpaper.sh \
     || fail "release-movingpaper.sh must run production smoke before publishing"
 grep -q "expected_dmg_bytes" scripts/release-movingpaper.sh \
     || fail "release-movingpaper.sh must verify live appcast artifact length"
-grep -q 'Accept-Encoding: gzip, deflate, br' scripts/release-movingpaper.sh \
+grep -q 'Accept-Encoding: gzip, deflate"' scripts/release-movingpaper.sh \
     || fail "release-movingpaper.sh must verify the appcast with the request Sparkle makes"
 if grep -q 'appcast_url}?t=' scripts/release-movingpaper.sh; then
     fail "release-movingpaper.sh must not cache-bust the live appcast check; that proves the origin, not what clients receive"

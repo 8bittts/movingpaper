@@ -29,9 +29,11 @@ verify_live_appcast() {
     # cache-busted or uncompressed request can see the new feed while the
     # copy Sparkle receives is still the previous one (measured on dockishOS
     # v0.031, whose raw.githubusercontent.com feed lagged by four minutes).
+    # No br: curl on macOS cannot decode Brotli, so a br response would fail
+    # every attempt.
     for attempt in $(seq 1 20); do
         if curl -fsSL --compressed \
-            -H "Accept-Encoding: gzip, deflate, br" \
+            -H "Accept-Encoding: gzip, deflate" \
             "${appcast_url}" \
             -o "$temp_appcast"; then
             if grep -Fq -- "<sparkle:shortVersionString>${expected_version}</sparkle:shortVersionString>" "$temp_appcast" \
