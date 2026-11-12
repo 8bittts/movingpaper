@@ -9,9 +9,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppIdentityDefaultsMigration.migrateIfNeeded()
 
-        // Menu bar only — no Dock icon, no Cmd+Tab entry
-        AppPresentation.returnToAccessory()
-
         let manager = WallpaperManager()
         self.wallpaperManager = manager
 
@@ -33,6 +30,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         sparkleUpdater.start()
+    }
+
+    /// Opening the app while it runs must do something visible; returning false
+    /// tells AppKit the app handled the reopen itself.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        statusBar?.handleReopen()
+        return false
+    }
+
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        statusBar?.makeDockMenu()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

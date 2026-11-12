@@ -235,6 +235,14 @@ struct MenuSnapshotTests {
         }
     }
 
+    @Test func dockRowsDropQuitAndItsSeparator() {
+        let full = MenuSnapshot.rows(from: baseInput())
+        let dock = MenuSnapshot.dockRows(from: baseInput())
+        #expect(dock == Array(full.dropLast(2)))
+        #expect(command(dock[dock.count - 1])?.id == .toggleOpenAtLogin)
+        #expect(!dock.contains { command($0)?.id == .quit })
+    }
+
     private func baseInput(downloadProgress: Double? = nil) -> MenuModelInput {
         MenuModelInput(
             downloadProgress: downloadProgress,

@@ -76,6 +76,19 @@ enum MenuSnapshot {
         return rows
     }
 
+    /// The status-menu rows for the Dock icon's menu, without Quit: the Dock
+    /// supplies its own.
+    static func dockRows(from input: MenuModelInput) -> [MenuRow] {
+        var rows = rows(from: input)
+        if case .command(let last) = rows.last, last.id == .quit {
+            rows.removeLast()
+        }
+        if rows.last == .separator {
+            rows.removeLast()
+        }
+        return rows
+    }
+
     private static func downloadRows(progress: Double?) -> [MenuRow] {
         guard let progress else { return [] }
         return [

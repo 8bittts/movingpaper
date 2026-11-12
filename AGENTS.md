@@ -48,6 +48,9 @@ Status-menu structure lives in `MenuSnapshot`; tests cover labels without launch
   Never use `gh api repos/sparkle-project/Sparkle/releases --jq '.[0]'` — it returns the newest release of any kind and would vendor a beta into a signed app.
   An empty `latest` response means the check failed, not that the pin is current.
   dockishOS `_docs/05-infrastructure.md` owns the full re-vendor procedure; follow it rather than duplicating it here.
-- Every Sparkle UI entry point must foreground this accessory app; keep the `AppPresentation.promoteToForeground()` + `startFloatingWindows()` pairing on all three entry points in `MovingPaperUpdater` — including `standardUserDriverWillShowModalAlert()` — and the `returnToAccessory()` restore on session finish.
+- `AppPresentation` is the only code that sets the activation policy: each surface that needs focus holds a `Reason` and ends it, and the app stays regular until the last hold ends.
+  Never call `NSApp.setActivationPolicy` elsewhere; a direct call drops the Dock icon from under another open surface.
+- Every Sparkle UI entry point must foreground this accessory app: all three entry points in `MovingPaperUpdater`, including `standardUserDriverWillShowModalAlert()`, call `beginPresentation()`, which holds `.updater` once per session, and `standardUserDriverWillFinishUpdateSession()` ends it.
+- Opening the app while it runs starts a Dock session (`StatusBarController.handleReopen`) because the system can hide the menu-bar extra while `NSStatusItem.isVisible` still reads true; the session ends when the status menu closes.
 - `_docs/todos.md` is the only active backlog; root `todos.md` is a tracked redirect stub — do not repopulate or delete it.
   Completed analysis belongs in `_docs/00-foundation.md` or git history.

@@ -161,7 +161,6 @@ final class WallpaperManager {
     private func cancelAssignment(for target: WallpaperAssignmentTarget) {
         requestCoordinator.cancel(target)
         loadingOverlay.hide()
-        AppPresentation.returnToAccessory()
     }
 
     /// Cancel every in-flight request, including the restore-redownload batch.
@@ -169,7 +168,6 @@ final class WallpaperManager {
         requestCoordinator.cancelAll()
         cancelRestoreTask()
         loadingOverlay.hide()
-        AppPresentation.returnToAccessory()
     }
 
     func cancelDownload() {
@@ -241,16 +239,18 @@ final class WallpaperManager {
 
     /// Pick a random video from the entire Photos library and set it as wallpaper.
     func shuffleFromPhotos(for displayID: CGDirectDisplayID? = nil) {
-        AppPresentation.promoteToForeground()
         let target = assignmentTarget(for: displayID)
         let originSpaceID = displayID.map { currentSpaceID(for: $0) }
         requestCoordinator.start(for: target) { [weak self] token in
             guard let self else { return }
+            // Foreground for the Photos authorization prompt; held until this
+            // request ends, whether it finishes, fails or is superseded.
+            AppPresentation.begin(.photosShuffle)
+            defer { AppPresentation.end(.photosShuffle) }
             loadingOverlay.show(message: "Shuffling…", on: screen(for: displayID))
             let outcome = await PhotosService.shuffle()
             guard requestCoordinator.isCurrent(token, for: target) else { return }
             loadingOverlay.hide()
-            AppPresentation.returnToAccessory()
 
             switch outcome {
             case .video(let url):

@@ -15,11 +15,12 @@ Dates are the evidence in this doc; the owner docs carry none.
 - 2026-11-10: the deployment target moves from macOS 15 to macOS 27; v0.044 is the last release for macOS 15 through 26.
 - 2026-11-10: the app icon becomes an Icon Composer document, closing HIG follow-up #45; the iconset pipeline and the run-time icon override are removed.
 - 2026-11-10: the menu-bar extra returns to the brand mark, now the system-rendered app icon in place of the template symbol the HIG pass introduced.
+- 2026-11-12: an Apple-docs audit of all of `sources/` lands in phases: counted activation-policy holds, the reopen Dock fallback, and the logic and API fixes recorded in git history.
 - 2026-11-12: v0.042 crashed at launch on the build Mac, so no status item appeared. v0.016 through v0.044 read SwiftPM's `Bundle.module` at launch, and its accessor resolves only the `.app` root and an absolute `.build/` path, never `Contents/Resources`. Those releases ran only where that build directory existed and trap at launch everywhere else, before Sparkle starts, so they cannot update themselves. v0.045 no longer reads it; the target now declares no resources and the smoke test fails a binary that carries the accessor.
 
 ## Decisions
 
-- **Dockless by design.** The app is an accessory (`LSUIElement`) with no Dock icon during normal use, update checks or install prompts; the Dock-fallback HIG item is deferred unless an explicit Show Dock Icon command is added.
+- **Dockless with a Dock fallback.** The app is an accessory (`LSUIElement`) with no Dock icon in normal use. It shows one while an alert, the open panel, the Photos picker or a Sparkle window is up. Opening the app while it runs also shows one, with the status menu as its Dock menu, because the system hides menu bar extras when the menu bar runs out of room and the HIG says not to rely on them; the Dock icon leaves once the status menu has been opened.
 - **No visible Settings surface** until a real preferences UI exists; `AGENTS.md` carries the rule.
 - **Exact pins for what the app downloads.** yt-dlp is pinned by version and SHA-256 and Sparkle by version, build and binary hash ([04-security.md](04-security.md)).
 - **One doc set for the two macOS apps.** dockishOS owns the Sparkle re-vendor procedure and MovingPaper cites it; MovingPaper's own release path lives in [05-infrastructure.md](05-infrastructure.md) rather than in a root build document or the README.
@@ -49,7 +50,7 @@ Concurrency, security and robustness fixes #26, #4 and #27, #13, #12, #41, #10 a
 
 ### Closed as won't-fix
 
-- #19 and #21, `AppPresentation` refcount: incompatible with the Sparkle lifecycle in `AGENTS.md`.
+- #19 and #21, `AppPresentation` refcount: closed then as incompatible with the Sparkle lifecycle; reopened and fixed on 2026-11-12, holding one `.updater` reason per Sparkle session.
 - #23, the ordering half: moot at launch-time eviction.
 - #22, the hidden Settings scene: sanctioned in `AGENTS.md`.
 - #20, menu builder extract: already decomposed sufficiently.

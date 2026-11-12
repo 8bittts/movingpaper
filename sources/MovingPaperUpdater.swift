@@ -10,6 +10,10 @@ final class MovingPaperUpdater: NSObject {
     /// Nil when the host bundle carries no Sparkle configuration (`swift run`).
     private var updaterController: SPUStandardUpdaterController?
     private var windowObserver: Any?
+    /// Whether this session holds `AppPresentation.Reason.updater`. Sparkle has
+    /// three entry points into one session and a single finish, so the hold is
+    /// taken once per session rather than once per entry point.
+    private var holdsPresentation = false
 
     /// Whether Sparkle can start a check right now. The status menu reads it
     /// each time it opens.
@@ -44,14 +48,33 @@ final class MovingPaperUpdater: NSObject {
             return
         }
 
-        AppPresentation.promoteToForeground()
-        startFloatingWindows()
+        beginPresentation()
         controller.updater.checkForUpdates()
     }
 
-    // MARK: - Window Level
+    // MARK: - Presentation
 
-    /// Float Sparkle's dialogs above all windows so they aren't buried.
+    /// Foreground the accessory app and float Sparkle's windows for this session.
+    private func beginPresentation() {
+        if holdsPresentation {
+            NSApp.activate()
+        } else {
+            holdsPresentation = true
+            AppPresentation.begin(.updater)
+        }
+        startFloatingWindows()
+    }
+
+    private func endPresentation() {
+        stopFloatingWindows()
+        guard holdsPresentation else { return }
+        holdsPresentation = false
+        AppPresentation.end(.updater)
+    }
+
+    /// Float Sparkle's own windows above other apps' windows so they aren't
+    /// buried. Only windows whose controller comes from the Sparkle framework are
+    /// raised; an open panel or alert of ours keeps its standard level.
     private func startFloatingWindows() {
         guard windowObserver == nil else { return }
         windowObserver = NotificationCenter.default.addObserver(
@@ -61,9 +84,18 @@ final class MovingPaperUpdater: NSObject {
         ) { notification in
             guard let window = notification.object as? NSWindow else { return }
             MainActor.assumeIsolated {
-                window.level = .floating
+                if Self.isSparkleWindow(window) {
+                    window.level = .floating
+                }
             }
         }
+    }
+
+    private static let sparkleBundle = Bundle(for: SPUStandardUpdaterController.self)
+
+    private static func isSparkleWindow(_ window: NSWindow) -> Bool {
+        guard let controller = window.windowController else { return false }
+        return Bundle(for: type(of: controller)) == sparkleBundle
     }
 
     private func stopFloatingWindows() {
@@ -116,18 +148,15 @@ extension MovingPaperUpdater: @preconcurrency SPUStandardUserDriverDelegate {
     /// app must foreground itself here too, or the alert surfaces without focus or
     /// behind other windows. Mirrors the update-available path below.
     func standardUserDriverWillShowModalAlert() {
-        AppPresentation.promoteToForeground()
-        startFloatingWindows()
+        beginPresentation()
     }
 
     func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool, forUpdate update: SUAppcastItem, state: SPUUserUpdateState) {
         guard handleShowingUpdate else { return }
-        AppPresentation.promoteToForeground()
-        startFloatingWindows()
+        beginPresentation()
     }
 
     func standardUserDriverWillFinishUpdateSession() {
-        stopFloatingWindows()
-        AppPresentation.returnToAccessory()
+        endPresentation()
     }
 }

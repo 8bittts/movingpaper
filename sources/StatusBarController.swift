@@ -23,15 +23,40 @@ final class StatusBarController: NSObject {
         statusItem.menu = menu
     }
 
+    private var menuInput: MenuModelInput {
+        wallpaperManager.menuInput(
+            canCheckForUpdates: updater.canCheckForUpdates,
+            openAtLogin: OpenAtLogin.isEnabled
+        )
+    }
+
     private func rebuildMenu(into menu: NSMenu) {
         menu.removeAllItems()
-        let rows = MenuSnapshot.rows(
-            from: wallpaperManager.menuInput(
-                canCheckForUpdates: updater.canCheckForUpdates,
-                openAtLogin: OpenAtLogin.isEnabled
-            )
-        )
-        append(rows, to: menu)
+        append(MenuSnapshot.rows(from: menuInput), to: menu)
+    }
+
+    // MARK: - Reopen and Dock Fallback
+
+    /// The app was opened while it runs. The system hides menu bar extras when
+    /// the menu bar runs out of room, and `NSStatusItem.isVisible` still reads
+    /// true then, so the app cannot tell whether the user can see its icon.
+    /// The first reopen starts a Dock session: a Dock icon whose menu carries
+    /// the same commands. A reopen during the session (a click on that Dock
+    /// icon) shows the menu at the pointer.
+    func handleReopen() {
+        statusItem.isVisible = true
+        if AppPresentation.isHeld(.dockSession) {
+            NSApp.activate()
+            makeMenu(MenuSnapshot.rows(from: menuInput))
+                .popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        } else {
+            AppPresentation.begin(.dockSession)
+        }
+    }
+
+    /// The Dock icon's menu. The Dock adds its own Quit item.
+    func makeDockMenu() -> NSMenu {
+        makeMenu(MenuSnapshot.dockRows(from: menuInput))
     }
 
     private func append(_ rows: [MenuRow], to menu: NSMenu) {
@@ -192,11 +217,11 @@ final class StatusBarController: NSObject {
     private func presentPhotosPicker(for displayID: CGDirectDisplayID?) {
         guard !isPickingFromPhotos else { return }
         isPickingFromPhotos = true
-        AppPresentation.promoteToForeground()
+        AppPresentation.begin(.photosPicker)
         Task {
             defer {
                 isPickingFromPhotos = false
-                AppPresentation.returnToAccessory()
+                AppPresentation.end(.photosPicker)
             }
             guard let url = await PhotosPickerController().run() else { return }
             wallpaperManager.setWallpaper(url: url, for: displayID)
@@ -221,7 +246,6 @@ final class StatusBarController: NSObject {
             alert.alertStyle = .informational
             alert.addButton(withTitle: "OK")
             alert.addButton(withTitle: "Visit YEN")
-            alert.window.level = .floating
             if alert.runModal() == .alertSecondButtonReturn {
                 NSWorkspace.shared.open(URL(string: "https://yen.chat")!)
             }
@@ -250,5 +274,12 @@ final class StatusBarController: NSObject {
 extension StatusBarController: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         rebuildMenu(into: menu)
+    }
+
+    /// The status menu opened, so the user can reach the menu-bar extra and the
+    /// Dock fallback has done its job.
+    func menuDidClose(_ menu: NSMenu) {
+        guard menu === statusItem.menu, AppPresentation.isHeld(.dockSession) else { return }
+        AppPresentation.end(.dockSession)
     }
 }

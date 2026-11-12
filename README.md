@@ -89,9 +89,10 @@ Everything on your desktop still works normally -- the animation sits underneath
 - **Sound control** -- mute or unmute video audio (muted by default)
 - **Multi-monitor** -- auto-detects displays, adapts on hot-plug
 - **Power-aware** -- pauses in place on Low Power Mode and thermal throttling
-- **Automatic update checks** -- checks hourly via Sparkle using its standard updater dialog kept dockless (app-managed activation policy), with signed feeds and verify-before-extraction enabled in staged builds
+- **Automatic update checks** -- checks hourly via Sparkle using its standard updater dialog, with signed feeds and verify-before-extraction enabled in staged builds
 - **Persistent** -- your wallpapers come back when you relaunch
-- **Menu bar only** -- no Dock icon during normal use, update checks, or update install prompts
+- **Menu bar first** -- no Dock icon in normal use; one appears only while a dialog or update window is open
+- **Dock fallback** -- if the menu bar hides the icon, open MovingPaper again: it shows a Dock icon whose menu has every command
 
 ## Menu
 
@@ -106,7 +107,7 @@ Everything on your desktop still works normally -- the animation sits underneath
 | **Pause / Resume** | Stop or restart playback |
 | **Remove MovingPaper** | Clear wallpaper |
 | **About MovingPaper** | Version and YEN credit |
-| **Check for Updates…** | Sparkle update check in a dockless updater dialog |
+| **Check for Updates…** | Sparkle update check |
 | **Open at Login** | Start MovingPaper when you log in |
 | **Quit MovingPaper** | Exit |
 

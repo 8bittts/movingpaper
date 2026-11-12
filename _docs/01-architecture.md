@@ -29,7 +29,7 @@ A video that cannot be loaded or played, and a GIF ImageIO rejects, reach `Wallp
 | -------------------- | ----------------------------- | ----------------------------------------------------------------------------------------- |
 | Routing              | `WallpaperWindowRouter`       | Hosts video and GIF directly in AppKit, never back through SwiftUI                        |
 | Persistence          | `WallpaperPersistenceStore`   | Saved wallpapers per display and Space, with versioned migrations covered by tests        |
-| Presentation         | `AppPresentation`             | Activation policy: accessory by default, foregrounded for Sparkle UI, restored afterwards |
+| Presentation         | `AppPresentation`             | Activation policy: accessory unless a surface holds a reason (modal, Photos picker, shuffle, Sparkle session, Dock session); regular until the last hold ends |
 | Cache cleanup        | `CacheJanitor`                | Evicts cached media; every enrolled cache needs a recovery story for an evicted file      |
 | Power state          | `PowerStateMonitor`           | Pauses in place on Low Power Mode and thermal throttling                                  |
 | Request cancellation | `WallpaperRequestCoordinator` | The newest user choice wins; stale YouTube and Photos results are canceled or ignored     |
