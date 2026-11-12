@@ -25,10 +25,14 @@ verify_live_appcast() {
     local temp_appcast
     temp_appcast="$(mktemp "${TMPDIR:-/tmp}/movingpaper-live-appcast.XXXXXX.xml")"
 
-    for attempt in 1 2 3 4 5 6 7 8 9 10; do
-        if curl -fsSL \
-            -H "Cache-Control: no-cache" \
-            "${appcast_url}?t=$(date +%s)" \
+    # Fetch exactly what Sparkle fetches: the plain feed URL with gzip. A
+    # cache-busted or uncompressed request can see the new feed while the
+    # copy Sparkle receives is still the previous one (measured on dockishOS
+    # v0.031, whose raw.githubusercontent.com feed lagged by four minutes).
+    for attempt in $(seq 1 20); do
+        if curl -fsSL --compressed \
+            -H "Accept-Encoding: gzip, deflate, br" \
+            "${appcast_url}" \
             -o "$temp_appcast"; then
             if grep -Fq -- "<sparkle:shortVersionString>${expected_version}</sparkle:shortVersionString>" "$temp_appcast" \
                 && grep -Fq -- "<sparkle:version>${expected_build}</sparkle:version>" "$temp_appcast" \
@@ -42,8 +46,8 @@ verify_live_appcast() {
             fi
         fi
 
-        step "Signed appcast not ready — retry ${attempt}/10 in 3s"
-        sleep 3
+        step "Signed appcast not ready for Sparkle clients — retry ${attempt}/20 in 6s"
+        sleep 6
     done
 
     rm -f "$temp_appcast"
