@@ -28,8 +28,10 @@ struct MenuSnapshotTests {
         let rows = MenuSnapshot.rows(from: input)
 
         #expect(rows[0] == .disabled("loop.mp4"))
-        #expect(command(rows[2])?.title == "Remove MovingPaper")
-        #expect(command(rows[2])?.id == .clearAll)
+        // Remove closes the source group, with no separators around the file name.
+        #expect(command(rows[5])?.title == "Remove MovingPaper")
+        #expect(command(rows[5])?.id == .clearAll)
+        #expect(rows[6] == .separator)
         #expect(containsCommand(rows, id: .togglePause, title: "Pause"))
     }
 
@@ -41,16 +43,33 @@ struct MenuSnapshotTests {
         let rows = MenuSnapshot.rows(from: input)
 
         #expect(containsCommand(rows, id: .toggleMute, title: "Turn Sound Off"))
-        guard case .submenu(let title, _, let modeRows) = rows.first(where: {
-            if case .submenu = $0 { return true }
-            return false
-        }) else {
-            Issue.record("Missing mode submenu")
-            return
-        }
-        #expect(title == "MovingPaper Mode")
-        #expect(command(modeRows[0])?.checked == false)
-        #expect(command(modeRows[1])?.checked == true)
+        #expect(firstCommand(rows, id: .togglePerDesktop)?.title == "Wallpaper per Desktop")
+        #expect(firstCommand(rows, id: .togglePerDesktop)?.checked == true)
+        #expect(firstCommand(MenuSnapshot.rows(from: baseInput()), id: .togglePerDesktop)?.checked == false)
+    }
+
+    /// Normalized to DockishOS: About and YEN Terminal, then GitHub Project and
+    /// Check for Updates…, then Quit, each group split by a separator.
+    @Test func footerFollowsTheDockishOSStatusMenu() {
+        let rows = MenuSnapshot.rows(from: baseInput())
+        let footer = Array(rows.suffix(7))
+        #expect(footer.map { command($0)?.id } == [
+            .about, .openYen, nil, .openRepository, .checkForUpdates, nil, .quit,
+        ])
+        #expect(footer[2] == .separator && footer[5] == .separator)
+        #expect(commandTitles(footer) == [
+            "About MovingPaper", "YEN Terminal", "GitHub Project", "Check for Updates…", "Quit MovingPaper",
+        ])
+    }
+
+    @Test func playbackAndAppTogglesShareOneGroup() {
+        var input = baseInput()
+        input.hasAnyWallpaper = true
+        input.sharedFileName = "loop.mp4"
+        let groups = MenuSnapshot.rows(from: input).split(separator: .separator)
+        let toggles = groups[1].compactMap { command($0)?.id }
+        #expect(toggles == [.togglePause, .toggleMute, .togglePerDesktop, .toggleOpenAtLogin])
+        #expect(groups.count == 5)
     }
 
     @Test func perDesktopWithNoDisplaysShowsAPlaceholder() {
@@ -162,6 +181,10 @@ struct MenuSnapshotTests {
 
     /// A fully populated menu in both modes, so every label and symbol is covered.
     private func everyRow() -> [MenuRow] {
+        everyMenu().flatMap { $0 }
+    }
+
+    private func everyMenu() -> [[MenuRow]] {
         var input = baseInput(downloadProgress: 0.42)
         input.hasAnyWallpaper = true
         input.sharedFileName = "clip.mp4"
@@ -176,7 +199,7 @@ struct MenuSnapshotTests {
                 SpaceMenuInput(fileName: nil, isCurrent: true),
             ]),
         ]
-        return allDesktops + MenuSnapshot.rows(from: input)
+        return [allDesktops, MenuSnapshot.rows(from: input)]
     }
 
     private func everyCommand(_ rows: [MenuRow]) -> [MenuCommand] {
@@ -204,12 +227,18 @@ struct MenuSnapshotTests {
                 }
             }
         }
-        check(everyRow())
+        for menu in everyMenu() {
+            check(menu)
+        }
     }
 
     @Test @MainActor func everySymbolNameIsARealSFSymbol() {
         let names = Set(everyCommand(everyRow()).compactMap(\.symbolName))
-        #expect(names == ["folder", "link", "photo.on.rectangle", "shuffle", "trash"])
+        #expect(names == [
+            "folder", "link", "photo.on.rectangle", "shuffle", "trash",
+            "info.circle", "terminal", "chevron.left.forwardslash.chevron.right",
+            "arrow.triangle.2.circlepath", "power",
+        ])
         for name in names {
             #expect(
                 NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil,
@@ -221,7 +250,7 @@ struct MenuSnapshotTests {
     /// Labels use title-style capitalization, never end in a period, and use the
     /// ellipsis character (not three periods) only as a trailing "needs more input" mark.
     @Test func labelsFollowTheMenuTextPattern() {
-        let lowercaseWords: Set<String> = ["a", "an", "the", "and", "or", "at", "by", "for", "from", "in", "of", "on", "to"]
+        let lowercaseWords: Set<String> = ["a", "an", "the", "and", "or", "at", "by", "for", "from", "in", "of", "on", "per", "to"]
         // File names and display names are user content, not copy.
         let titles = commandTitles(everyRow()).filter { !$0.contains(".mp4") && $0 != "Built-in" && $0 != "Studio Display" }
         #expect(titles.count > 20)
@@ -247,7 +276,7 @@ struct MenuSnapshotTests {
         let full = MenuSnapshot.rows(from: baseInput())
         let dock = MenuSnapshot.dockRows(from: baseInput())
         #expect(dock == Array(full.dropLast(2)))
-        #expect(command(dock[dock.count - 1])?.id == .toggleOpenAtLogin)
+        #expect(command(dock[dock.count - 1])?.id == .checkForUpdates)
         #expect(!dock.contains { command($0)?.id == .quit })
     }
 

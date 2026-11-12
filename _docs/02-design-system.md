@@ -23,10 +23,18 @@ Regular glass, not clear, because the panel carries text and must stay legible o
 The surface is an AppKit view on purpose: it composites against what is behind the window, while a SwiftUI `glassEffect` in a transparent panel has nothing to sample and draws a flat slab.
 `LoadingOverlayView` supplies only the content, so Reduce Transparency, Increase Contrast, light and dark appearance and Reduce Motion are handled by the system.
 
+## Status menu
+
+The status menu follows DockishOS's, in groups split by separators: the download in flight; the wallpaper and its sources, ending in Remove; Pause, Turn Sound On, Wallpaper per Desktop and Open at Login; About MovingPaper and YEN Terminal (https://yen.chat); GitHub Project and Check for Updates…; Quit MovingPaper.
+Mode is one checkmark item, Wallpaper per Desktop, not a submenu: All Desktops is that item turned off.
+About opens the standard About panel (icon, name, version and `NSHumanReadableCopyright`, "Copyright 2026 8BIT. MIT licensed."), not a custom alert.
+
 ## Menu symbols
 
-The four wallpaper sources and Remove carry SF Symbols (`folder`, `link`, `photo.on.rectangle`, `shuffle`, `trash`); no other menu item does.
+The sources and Remove carry `folder`, `link`, `photo.on.rectangle`, `shuffle` and `trash`; the last three groups carry `info.circle`, `terminal`, `chevron.left.forwardslash.chevron.right`, `arrow.triangle.2.circlepath` and `power`, at 13 points and medium weight as in DockishOS.
+The toggle group carries none, because its checkmarks show state.
 A group has a symbol on every command or on none, and a `MenuSnapshot` test enforces it.
+Measured on macOS 27.2: the status menu draws no item images at all, so the symbols are not visible there; the titles must carry the meaning on their own.
 
 ## Typography
 
@@ -41,7 +49,7 @@ All copy is English.
 | ----------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------ |
 | Menu item               | Title-style capitalization, no ending punctuation                                             | `Shuffle from Photos`                |
 | Menu item needing input | A trailing ellipsis character, never three periods                                            | `Choose File…`                       |
-| Toggled menu item       | A changeable label with a verb, or a checkmark for an attribute in effect                     | `Turn Sound Off`, `Open at Login`    |
+| Toggled menu item       | A changeable label with a verb, or a checkmark for an attribute in effect                     | `Turn Sound Off`, `Wallpaper per Desktop` |
 | Alert title             | A sentence fragment in title-style capitalization, no ending punctuation                      | `Download Failed`                    |
 | Alert message           | Complete sentences, sentence-style capitalization, ending punctuation, contractions           | `The video couldn't be played.`      |
 | Alert button            | One or two words naming the result; `OK` only when the alert is informational; always `Cancel` | `Download`                           |

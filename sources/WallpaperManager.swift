@@ -360,6 +360,10 @@ final class WallpaperManager {
         rebuildAllWindows()
     }
 
+    func togglePerDesktop() {
+        setMode(mode == .perDesktop ? .allDesktops : .perDesktop)
+    }
+
     func togglePause() {
         isPaused.toggle()
         if isPaused {

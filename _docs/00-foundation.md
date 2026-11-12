@@ -16,6 +16,7 @@ Dates are the evidence in this doc; the owner docs carry none.
 - 2026-11-10: the app icon becomes an Icon Composer document, closing HIG follow-up #45; the iconset pipeline and the run-time icon override are removed.
 - 2026-11-10: the menu-bar extra returns to the brand mark, now the system-rendered app icon in place of the template symbol the HIG pass introduced.
 - 2026-11-12: an Apple-docs audit of all of `sources/` lands in phases: counted activation-policy holds, the reopen Dock fallback, and the logic and API fixes recorded in git history.
+- 2026-11-12: the status menu is normalized to DockishOS's: the mode submenu becomes the Wallpaper per Desktop checkmark, the toggles share one group, About opens the standard About panel with DockishOS's copyright statement (the plist said "All rights reserved" against the MIT license), and YEN Terminal and GitHub Project join the menu.
 - 2026-11-12: v0.042 crashed at launch on the build Mac, so no status item appeared. v0.016 through v0.044 read SwiftPM's `Bundle.module` at launch, and its accessor resolves only the `.app` root and an absolute `.build/` path, never `Contents/Resources`. Those releases ran only where that build directory existed and trap at launch everywhere else, before Sparkle starts, so they cannot update themselves. v0.045 no longer reads it; the target now declares no resources and the smoke test fails a binary that carries the accessor.
 
 ## Decisions

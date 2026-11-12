@@ -10,6 +10,8 @@ final class StatusBarController: NSObject {
     private let wallpaperManager: WallpaperManager
     private let updater: MovingPaperUpdater
     private var isPickingFromPhotos = false
+    private var aboutPanel: NSWindow?
+    private var aboutPanelObserver: NSObjectProtocol?
 
     init(wallpaperManager: WallpaperManager, updater: MovingPaperUpdater) {
         self.wallpaperManager = wallpaperManager
@@ -108,7 +110,9 @@ final class StatusBarController: NSObject {
         }
         if let symbolName = command.symbolName {
             // Decorative: the title already names the action for VoiceOver.
-            item.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)
+            // The size and weight match DockishOS's status menu.
+            item.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
+                .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 13, weight: .medium))
         }
         return item
     }
@@ -124,10 +128,11 @@ final class StatusBarController: NSObject {
         case .clearDisplay: #selector(clearDisplayWallpaper(_:))
         case .toggleMute: #selector(toggleMute)
         case .togglePause: #selector(togglePause)
-        case .setModeAllDesktops: #selector(setModeAllDesktops)
-        case .setModePerDesktop: #selector(setModePerDesktop)
+        case .togglePerDesktop: #selector(togglePerDesktop)
         case .checkForUpdates: #selector(checkForUpdates)
         case .about: #selector(about)
+        case .openYen: #selector(openYen)
+        case .openRepository: #selector(openRepository)
         case .toggleOpenAtLogin: #selector(toggleOpenAtLogin)
         case .quit: #selector(quit)
         }
@@ -160,12 +165,8 @@ final class StatusBarController: NSObject {
         wallpaperManager.toggleMute()
     }
 
-    @objc private func setModeAllDesktops() {
-        wallpaperManager.setMode(.allDesktops)
-    }
-
-    @objc private func setModePerDesktop() {
-        wallpaperManager.setMode(.perDesktop)
+    @objc private func togglePerDesktop() {
+        wallpaperManager.togglePerDesktop()
     }
 
     @objc private func pasteYouTube(_ sender: NSMenuItem) {
@@ -236,23 +237,49 @@ final class StatusBarController: NSObject {
         updater.checkForUpdates()
     }
 
+    /// The standard About panel, as in DockishOS: icon, name, version and
+    /// copyright from the bundle. It is not modal, so the app holds
+    /// `.aboutPanel` until the panel closes.
     @objc private func about() {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
-        // HIG: About shows "copyright and version information".
-        let copyright = Bundle.main.object(forInfoDictionaryKey: "NSHumanReadableCopyright") as? String ?? ""
-        AppPresentation.withForegroundActivation {
-            let alert = NSAlert()
-            alert.messageText = "MovingPaper"
-            let versionLine = version.isEmpty ? "" : "Version \(version)\n\n"
-            let copyrightLine = copyright.isEmpty ? "" : "\n\n\(copyright)"
-            alert.informativeText = "\(versionLine)A moving wallpaper for your desktop.\n\nBuilt with YEN — yen.chat\(copyrightLine)"
-            alert.alertStyle = .informational
-            alert.addButton(withTitle: "OK")
-            alert.addButton(withTitle: "Visit YEN")
-            if alert.runModal() == .alertSecondButtonReturn {
-                NSWorkspace.shared.open(URL(string: "https://yen.chat")!)
+        if let aboutPanel, aboutPanel.isVisible {
+            NSApp.activate()
+            aboutPanel.makeKeyAndOrderFront(nil)
+            return
+        }
+        let visibleBefore = Set(NSApp.windows.filter(\.isVisible).map(ObjectIdentifier.init))
+        AppPresentation.begin(.aboutPanel)
+        NSApp.orderFrontStandardAboutPanel(nil)
+        guard let panel = NSApp.windows.first(where: { $0.isVisible && !visibleBefore.contains(ObjectIdentifier($0)) }) else {
+            AppPresentation.end(.aboutPanel)
+            return
+        }
+        aboutPanel = panel
+        aboutPanelObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: panel,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.aboutPanelDidClose()
             }
         }
+    }
+
+    private func aboutPanelDidClose() {
+        if let aboutPanelObserver {
+            NotificationCenter.default.removeObserver(aboutPanelObserver)
+        }
+        aboutPanelObserver = nil
+        aboutPanel = nil
+        AppPresentation.end(.aboutPanel)
+    }
+
+    @objc private func openYen() {
+        NSWorkspace.shared.open(AppLinks.yenTerminal)
+    }
+
+    @objc private func openRepository() {
+        NSWorkspace.shared.open(AppLinks.repository)
     }
 
     @objc private func toggleOpenAtLogin() {

@@ -36,10 +36,11 @@ enum MenuCommandID: Equatable {
     case clearDisplay
     case toggleMute
     case togglePause
-    case setModeAllDesktops
-    case setModePerDesktop
+    case togglePerDesktop
     case checkForUpdates
     case about
+    case openYen
+    case openRepository
     case toggleOpenAtLogin
     case quit
 }
@@ -65,12 +66,16 @@ enum MenuRow: Equatable {
 
 /// Pure status-menu structure. `StatusBarController` turns these rows into `NSMenuItem`s.
 enum MenuSnapshot {
+    /// Groups, split by separators: the download in flight; the wallpaper and
+    /// its sources; playback and app toggles; About and YEN Terminal; GitHub
+    /// Project and Check for Updates…; Quit. The order of the last three groups
+    /// follows DockishOS's status menu.
     static func rows(from input: MenuModelInput) -> [MenuRow] {
         var rows: [MenuRow] = []
         rows.append(contentsOf: downloadRows(progress: input.downloadProgress))
         rows.append(contentsOf: sourceRows(from: input))
         rows.append(.separator)
-        rows.append(contentsOf: playbackRows(from: input))
+        rows.append(contentsOf: toggleRows(from: input))
         rows.append(.separator)
         rows.append(contentsOf: footerRows(from: input))
         return rows
@@ -111,11 +116,11 @@ enum MenuSnapshot {
         var rows: [MenuRow] = []
         if let fileName = input.sharedFileName {
             rows.append(.disabled(MenuBarLabelFormatter.sharedWallpaperTitle(fileName: fileName)))
-            rows.append(.separator)
-            rows.append(.command(MenuCommand(title: "Remove MovingPaper", id: .clearAll)))
-            rows.append(.separator)
         }
         rows.append(contentsOf: sourceCommands(displayID: nil, includeRemove: false))
+        if input.sharedFileName != nil {
+            rows.append(.command(MenuCommand(title: "Remove MovingPaper", id: .clearAll, symbolName: "trash")))
+        }
         return rows
     }
 
@@ -138,8 +143,7 @@ enum MenuSnapshot {
             }
         }
         if input.hasAnyWallpaper {
-            rows.append(.separator)
-            rows.append(.command(MenuCommand(title: "Remove All MovingPapers", id: .clearAll)))
+            rows.append(.command(MenuCommand(title: "Remove All MovingPapers", id: .clearAll, symbolName: "trash")))
         }
         return rows
     }
@@ -185,32 +189,26 @@ enum MenuSnapshot {
         return rows
     }
 
-    private static func playbackRows(from input: MenuModelInput) -> [MenuRow] {
-        var rows: [MenuRow] = [
-            .command(MenuCommand(
-                title: input.isMuted ? "Turn Sound On" : "Turn Sound Off",
-                id: .toggleMute
-            )),
-            .submenu(title: "MovingPaper Mode", rows: [
-                .command(MenuCommand(
-                    title: "All Desktops",
-                    id: .setModeAllDesktops,
-                    checked: input.mode == .allDesktops
-                )),
-                .command(MenuCommand(
-                    title: "Per Desktop",
-                    id: .setModePerDesktop,
-                    checked: input.mode == .perDesktop
-                )),
-            ]),
-        ]
+    /// Playback and app toggles. Mode is one checkmark item rather than a
+    /// two-item submenu: All Desktops is simply Per Desktop turned off.
+    private static func toggleRows(from input: MenuModelInput) -> [MenuRow] {
+        var rows: [MenuRow] = []
         if input.hasAnyWallpaper {
-            rows.append(.separator)
             rows.append(.command(MenuCommand(
                 title: input.isPaused ? "Resume" : "Pause",
                 id: .togglePause
             )))
         }
+        rows.append(.command(MenuCommand(
+            title: input.isMuted ? "Turn Sound On" : "Turn Sound Off",
+            id: .toggleMute
+        )))
+        rows.append(.command(MenuCommand(
+            title: "Wallpaper per Desktop",
+            id: .togglePerDesktop,
+            checked: input.mode == .perDesktop
+        )))
+        rows.append(.command(loginItemCommand(input.loginItem)))
         return rows
     }
 
@@ -229,15 +227,23 @@ enum MenuSnapshot {
 
     private static func footerRows(from input: MenuModelInput) -> [MenuRow] {
         [
-            .command(MenuCommand(title: "About MovingPaper", id: .about)),
+            .command(MenuCommand(title: "About MovingPaper", id: .about, symbolName: "info.circle")),
+            .command(MenuCommand(title: "YEN Terminal", id: .openYen, symbolName: "terminal")),
+            .separator,
+            .command(MenuCommand(
+                title: "GitHub Project",
+                id: .openRepository,
+                symbolName: "chevron.left.forwardslash.chevron.right"
+            )),
             .command(MenuCommand(
                 title: "Check for Updates…",
                 id: .checkForUpdates,
-                enabled: input.canCheckForUpdates
+                enabled: input.canCheckForUpdates,
+                symbolName: "arrow.triangle.2.circlepath"
             )),
-            .command(loginItemCommand(input.loginItem)),
             .separator,
-            .command(MenuCommand(title: "Quit MovingPaper", id: .quit, keyEquivalent: "q")),
+            // The app has no Dock icon, so this is the only way to quit it.
+            .command(MenuCommand(title: "Quit MovingPaper", id: .quit, keyEquivalent: "q", symbolName: "power")),
         ]
     }
 }

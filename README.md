@@ -102,16 +102,18 @@ Everything on your desktop still works normally -- the animation sits underneath
 | **Paste YouTube URL…** | Download a supported YouTube URL as wallpaper |
 | **Choose from Photos…** | Pick a video from your Photos library |
 | **Shuffle from Photos** | Random video from your entire library |
-| **Turn Sound On / Off** | Toggle video audio |
-| **MovingPaper Mode** | All Desktops or Per Desktop |
-| **Pause / Resume** | Stop or restart playback |
 | **Remove MovingPaper** | Clear wallpaper |
-| **About MovingPaper** | Version and YEN credit |
-| **Check for Updates…** | Sparkle update check |
+| **Pause / Resume** | Stop or restart playback |
+| **Turn Sound On / Off** | Toggle video audio |
+| **Wallpaper per Desktop** | Give each Space and monitor its own wallpaper; off means one wallpaper everywhere |
 | **Open at Login** | Start MovingPaper when you log in |
+| **About MovingPaper** | Version and copyright |
+| **YEN Terminal** | Open [yen.chat](https://yen.chat) |
+| **GitHub Project** | Open this repository |
+| **Check for Updates…** | Sparkle update check |
 | **Quit MovingPaper** | Exit |
 
-In **Per Desktop** mode, each Space and monitor gets its own wallpaper -- switch Spaces and the wallpaper changes with it, even when macOS is keeping separate active Spaces on different displays.
+With **Wallpaper per Desktop** on, each Space and monitor gets its own wallpaper -- switch Spaces and the wallpaper changes with it, even when macOS is keeping separate active Spaces on different displays.
 
 ---
 

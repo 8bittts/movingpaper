@@ -20,6 +20,8 @@ enum AppPresentation {
         case photosShuffle
         /// A Sparkle update session.
         case updater
+        /// The standard About panel, until it closes.
+        case aboutPanel
         /// The Dock fallback started when the app is opened while it runs.
         case dockSession
     }
