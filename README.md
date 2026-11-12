@@ -44,10 +44,13 @@ It's the kind of app that makes you smile every time you minimize a window.
 
 Open the `.dmg`, drag **MovingPaper** to Applications, launch it.
 Look for the MovingPaper icon -- the night sky -- in your menu bar. That's it.
+If a crowded menu bar hides the icon, open MovingPaper again: it shows a Dock icon with the same menu.
 
 > Apple Silicon (arm64). Code-signed with Developer ID and notarized by Apple. Auto-updates via Sparkle.
 >
 > MovingPaper requires macOS 27 from the release after v0.044. v0.044 is the last release for macOS 15 through 26, and Sparkle does not offer a newer one to those Macs.
+>
+> If an earlier version quits as soon as it opens, download this release over it: v0.044 and earlier can crash at launch before they check for updates.
 
 ### Homebrew
 

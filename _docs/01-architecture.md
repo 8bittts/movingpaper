@@ -29,7 +29,7 @@ A video that cannot be loaded or played, and a GIF ImageIO rejects, reach `Wallp
 | -------------------- | ----------------------------- | ----------------------------------------------------------------------------------------- |
 | Routing              | `WallpaperWindowRouter`       | Hosts video and GIF directly in AppKit, never back through SwiftUI                        |
 | Persistence          | `WallpaperPersistenceStore`   | Saved wallpapers per display and Space, with versioned migrations covered by tests        |
-| Presentation         | `AppPresentation`             | Activation policy: accessory unless a surface holds a reason (modal, Photos picker, shuffle, Sparkle session, Dock session); regular until the last hold ends |
+| Presentation         | `AppPresentation`             | Activation policy: accessory unless a surface holds a reason (modal, Photos picker, shuffle, Sparkle session, About panel, Dock session); regular until the last hold ends |
 | Cache cleanup        | `CacheJanitor`                | Evicts cached media; every enrolled cache needs a recovery story for an evicted file      |
 | Power state          | `PowerStateMonitor`           | Pauses in place on Low Power Mode and thermal throttling                                  |
 | Request cancellation | `WallpaperRequestCoordinator` | The newest user choice wins; stale YouTube and Photos results are canceled or ignored     |
@@ -61,6 +61,7 @@ Launch-time cache cleanup skips files modified after launch, which belong to wor
 `OpenAtLogin` manages the login item; a login item waiting on approval shows `Allow Open at Login…` and opens the Login Items settings, because registering again fails until the user approves it.
 `MovingPaperUpdater` drives Sparkle; every entry point holds the `.updater` presentation reason once per session and the session finish ends it.
 Opening the app while it runs starts a Dock session: a Dock icon whose menu is the status menu without Quit, ended when the status menu closes.
+`AppPresentation.begin` makes the app regular before it calls `NSApp.activate()`: the system declines `activate()` for an accessory app that no other app yielded to (measured by DockishOS on macOS 27), so reversing the order leaves alerts and the About panel behind other windows.
 The menu is rebuilt each time it opens, so it reads `canCheckForUpdates` and the download fraction directly; nothing publishes them.
 `MovingPaperApp` keeps a hidden `Settings { EmptyView() }` scene for lifecycle only and replaces `.appSettings` with an empty command group.
 `AppIdentity` carries the production bundle identifier `com.8bittts.movingpaper`, and `AppIdentityDefaultsMigration` migrates defaults written under earlier identities.

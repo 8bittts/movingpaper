@@ -20,6 +20,7 @@
 
 - [ ] **#29 runtime sanity check** — With a fullscreen app covering the wallpaper, confirm `WallpaperWindowController` pauses the video or GIF on occlusion and resumes when visible again. Also confirm a wallpaper set in Low Power Mode holds its first frame and starts when Low Power Mode ends. Low-risk; revertable if wrong.
 - [ ] **#51 Photos entitlement runtime check** — On the next notarized build, confirm Shuffle from Photos prompts for access and exports a video. The release app now carries `com.apple.security.personal-information.photos-library`; earlier builds ran under Hardened Runtime without it.
+- [ ] **#53 Audit-fix runtime checks** — On a live build, confirm: two YouTube downloads started on different Spaces of one display both finish; Shuffle from Photos ends and its Dock icon leaves; a chosen file moved to another folder comes back after relaunch; a login item revoked in System Settings shows `Allow Open at Login…` and opens Login Items. Unit tests cover each; none was exercised live.
 - [ ] **#52 CI test run** — CI only compiles, because the app requires macOS 27 and GitHub hosts no macOS 27 runner. When one exists, move `.github/workflows/ci.yml` to it and restore `swift test --parallel`.
 
 Deferred Apple HIG follow-ups (not this pass):
