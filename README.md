@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <!-- version-badge -->v0.045<!-- /version-badge --> · macOS 27+ · Apple Silicon · Swift 6 · MIT · <a href="https://x.com/8BIT/status/2043384259482902603">Short Demo</a>
+  <!-- version-badge -->v0.046<!-- /version-badge --> · macOS 27+ · Apple Silicon · Swift 6 · MIT · <a href="https://x.com/8BIT/status/2043384259482902603">Short Demo</a>
 </p>
 
 ---
@@ -39,7 +39,7 @@ It's the kind of app that makes you smile every time you minimize a window.
 ## Download
 
 <!-- download-link -->
-[**Download MovingPaper v0.045**](https://github.com/8bittts/movingpaper/releases/download/v0.045/MovingPaper-0.045.dmg)
+[**Download MovingPaper v0.046**](https://github.com/8bittts/movingpaper/releases/download/v0.046/MovingPaper-0.046.dmg)
 <!-- /download-link -->
 
 Open the `.dmg`, drag **MovingPaper** to Applications, launch it.
