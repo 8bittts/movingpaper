@@ -296,6 +296,40 @@ struct WallpaperPersistenceStoreTests {
         #expect(loaded.state.knownSpaces[5] == nil)
     }
 
+    @Test func aMovedUserFileIsFoundThroughItsBookmark() throws {
+        let defaults = try temporaryDefaults()
+        defer { defaults.cleanup() }
+
+        let original = defaults.directory.appendingPathComponent("before.mp4")
+        let moved = defaults.directory.appendingPathComponent("after.mp4")
+        FileManager.default.createFile(atPath: original.path(percentEncoded: false), contents: Data([1]))
+        let store = WallpaperPersistenceStore(userDefaults: defaults.userDefaults, displayIdentity: .none)
+        let key = DesktopKey(displayID: 4)
+        var state = WallpaperState()
+        state.setEntry(WallpaperEntry(localURL: original, youtubeOrigin: nil), for: key)
+        store.save(mode: .allDesktops, isMuted: true, state: state)
+
+        try FileManager.default.moveItem(at: original, to: moved)
+        let loaded = store.load()
+
+        #expect(loaded.state.entries[key]?.localURL.resolvingSymlinksInPath() == moved.resolvingSymlinksInPath())
+    }
+
+    @Test func youTubeRecordsCarryNoBookmark() throws {
+        let defaults = try temporaryDefaults()
+        defer { defaults.cleanup() }
+
+        let file = defaults.directory.appendingPathComponent("yt.mp4")
+        FileManager.default.createFile(atPath: file.path(percentEncoded: false), contents: Data([1]))
+        var state = WallpaperState()
+        state.setEntry(WallpaperEntry(localURL: file, youtubeOrigin: "https://youtu.be/x"), for: DesktopKey(displayID: 4))
+        WallpaperPersistenceStore(userDefaults: defaults.userDefaults, displayIdentity: .none)
+            .save(mode: .allDesktops, isMuted: true, state: state)
+
+        let saved = defaults.userDefaults.array(forKey: "desktopFiles") as? [[String: Any]]
+        #expect(saved?.first?["bookmark"] == nil)
+    }
+
     @Test func aDisconnectedDisplayKeepsItsSavedID() throws {
         let defaults = try temporaryDefaults()
         defer { defaults.cleanup() }

@@ -70,6 +70,9 @@ final class LoadingOverlayController {
         window.hasShadow = true
         window.ignoresMouseEvents = true
         window.isReleasedWhenClosed = false
+        // NSPanel defaults to hiding on deactivate; the overlay must stay up
+        // while the user works in another app during a download.
+        window.hidesOnDeactivate = false
         window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
 

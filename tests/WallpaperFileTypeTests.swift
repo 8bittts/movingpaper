@@ -1,4 +1,5 @@
 import Testing
+import UniformTypeIdentifiers
 import Foundation
 @testable import MovingPaper
 
@@ -38,6 +39,13 @@ struct WallpaperFileTypeTests {
     @Test func noExtension() {
         let url = URL(fileURLWithPath: "/tmp/wallpaper")
         #expect(WallpaperFileType.detect(for: url) == nil)
+    }
+
+    @Test func openPanelTypesMatchTheDetectedExtensions() {
+        let extensions = Set(WallpaperFileType.allowedContentTypes.compactMap(\.preferredFilenameExtension))
+        #expect(WallpaperFileType.allowedContentTypes.count == 4)
+        #expect(extensions.isSubset(of: ["gif", "mov", "mp4", "m4v", "qt", "mpg4"]))
+        #expect(!WallpaperFileType.allowedContentTypes.contains(.avi))
     }
 
     @Test func movieContainerThatIsNotAKnownWallpaperExtensionIsRejected() {

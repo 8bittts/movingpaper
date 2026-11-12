@@ -61,6 +61,8 @@ enum YTDLPInstaller {
         do {
             let (data, response) = try await URLSession.shared.data(from: downloadURL)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+                Log.youtube.error("yt-dlp \(pinnedVersion, privacy: .public) download returned HTTP \(status, privacy: .public)")
                 return nil
             }
             guard sha256Hex(of: data) == pinnedSHA256 else {
@@ -76,6 +78,7 @@ enum YTDLPInstaller {
             )
             return installURL.path(percentEncoded: false)
         } catch {
+            Log.youtube.error("yt-dlp install failed: \(error.localizedDescription, privacy: .public)")
             return nil
         }
     }

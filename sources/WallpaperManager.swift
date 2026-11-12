@@ -180,7 +180,9 @@ final class WallpaperManager {
     func selectFile(for displayID: CGDirectDisplayID? = nil) {
         AppPresentation.withForegroundActivation {
             let panel = NSOpenPanel()
-            panel.allowedContentTypes = [.gif, .mpeg4Movie, .quickTimeMovie, .movie]
+            // Exactly the types `WallpaperFileType` plays; `.movie` would admit
+            // formats such as AVI that the app then rejects.
+            panel.allowedContentTypes = WallpaperFileType.allowedContentTypes
             panel.allowsMultipleSelection = false
             panel.canChooseDirectories = false
             panel.message = "Choose a GIF or video file to use as your wallpaper."
@@ -309,7 +311,8 @@ final class WallpaperManager {
 
     private func handlePlaybackFailure(url: URL, message: String) {
         let path = url.path(percentEncoded: false)
-        Log.playback.error("Playback failed for \(path, privacy: .public): \(message, privacy: .public)")
+        // The full path names the user's folders, so only the file name is public.
+        Log.playback.error("Playback failed for \(url.lastPathComponent, privacy: .public) (\(path, privacy: .private(mask: .hash))): \(message, privacy: .public)")
         guard reportedPlaybackFailures.insert(path).inserted else { return }
         AppPresentation.showAlert(title: "Playback Failed", message: message, style: .warning)
     }

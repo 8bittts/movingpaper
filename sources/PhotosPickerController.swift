@@ -81,7 +81,7 @@ extension PhotosPickerController: PHPickerViewControllerDelegate {
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
 
         // The temporary file exists only inside this callback, so the copy happens here.
-        result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { tempURL, _ in
+        result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { tempURL, error in
             var cachedURL: URL?
             if let tempURL {
                 let ext = tempURL.pathExtension
@@ -89,9 +89,14 @@ extension PhotosPickerController: PHPickerViewControllerDelegate {
                 let dest = cacheDir.appendingPathComponent(name)
                 // Only hand back a URL if the copy actually landed a file — otherwise
                 // the caller would try to render a path that doesn't exist.
-                if (try? FileManager.default.copyItem(at: tempURL, to: dest)) != nil {
+                do {
+                    try FileManager.default.copyItem(at: tempURL, to: dest)
                     cachedURL = dest
+                } catch {
+                    Log.photos.error("Couldn't copy the picked video: \(error.localizedDescription, privacy: .public)")
                 }
+            } else if let error {
+                Log.photos.error("Photos picker load failed: \(error.localizedDescription, privacy: .public)")
             }
             Task { @MainActor in self.finish(with: cachedURL) }
         }

@@ -95,6 +95,7 @@ final class YouTubeDownloader {
         guard !Task.isCancelled else { return .cancelled }
 
         try? FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+        excludeCacheFromBackup()
 
         let downloadID = UUID()
         activeDownloadID = downloadID
@@ -135,6 +136,20 @@ final class YouTubeDownloader {
         case .cancelled:
             removeIntermediates(videoID: videoID)
             return .cancelled
+        }
+    }
+
+    /// Apple: exclude files the app can download again, such as videos kept for
+    /// offline viewing, from backups. Every file here can be fetched again from
+    /// its saved YouTube URL; the Photos caches cannot, so they stay backed up.
+    private func excludeCacheFromBackup() {
+        var directory = cacheDirectory
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        do {
+            try directory.setResourceValues(values)
+        } catch {
+            Log.youtube.error("Couldn't exclude the YouTube cache from backup: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -286,10 +301,15 @@ final class YouTubeDownloader {
                 }
             }
 
+            // The termination handler also clears this one, but it can run before
+            // this line installs it; an empty read is the end, so clear it there too.
             outputPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
                 let chunk = handle.availableData
-                guard !chunk.isEmpty,
-                      let fraction = Self.progressFraction(in: String(decoding: chunk, as: UTF8.self))
+                guard !chunk.isEmpty else {
+                    handle.readabilityHandler = nil
+                    return
+                }
+                guard let fraction = Self.progressFraction(in: String(decoding: chunk, as: UTF8.self))
                 else { return }
                 Task { @MainActor [weak self] in
                     guard let self, self.activeDownloadID == downloadID else { return }

@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import UniformTypeIdentifiers
 
 /// How wallpapers are assigned.
 enum WallpaperMode: String {
@@ -39,4 +40,8 @@ enum WallpaperFileType {
         default: return nil
         }
     }
+
+    /// The open panel's filter: exactly the extensions `detect` accepts.
+    static let allowedContentTypes: [UTType] = ["gif", "mov", "mp4", "m4v"]
+        .compactMap { UTType(filenameExtension: $0) }
 }

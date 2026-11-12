@@ -11,7 +11,8 @@ struct WallpaperRedownloadRequest: Equatable {
 
 /// One on-disk wallpaper record. Schema v1 keys are `displayID`, `spaceID`,
 /// `path` and optional `youtubeURL`; v2 adds optional `displayUUID`, which
-/// survives a restart where `displayID` may not. Keys must stay stable unless
+/// survives a restart where `displayID` may not, and optional `bookmark`, which
+/// finds a user's file after it is moved or renamed. Keys must stay stable unless
 /// `currentSchemaVersion` bumps. `displayID` is still written, so an older build
 /// can read a v2 record.
 struct WallpaperPersistedRecord: Equatable {
@@ -20,13 +21,15 @@ struct WallpaperPersistedRecord: Equatable {
     var path: String
     var youtubeURL: String?
     var displayUUID: String?
+    var bookmark: Data?
 
-    init(key: DesktopKey, path: String, youtubeURL: String?, displayUUID: String? = nil) {
+    init(key: DesktopKey, path: String, youtubeURL: String?, displayUUID: String? = nil, bookmark: Data? = nil) {
         self.displayID = key.displayID
         self.spaceID = key.spaceID
         self.path = path
         self.youtubeURL = youtubeURL
         self.displayUUID = displayUUID
+        self.bookmark = bookmark
     }
 
     init?(plistObject: [String: Any]) {
@@ -42,6 +45,7 @@ struct WallpaperPersistedRecord: Equatable {
         self.path = path
         self.youtubeURL = plistObject["youtubeURL"] as? String
         self.displayUUID = plistObject["displayUUID"] as? String
+        self.bookmark = plistObject["bookmark"] as? Data
     }
 
     var key: DesktopKey {
@@ -59,6 +63,9 @@ struct WallpaperPersistedRecord: Equatable {
         }
         if let displayUUID {
             record["displayUUID"] = displayUUID
+        }
+        if let bookmark {
+            record["bookmark"] = bookmark
         }
         return record
     }
@@ -109,8 +116,24 @@ struct WallpaperPersistenceStore {
             key: key,
             path: path.path(percentEncoded: false),
             youtubeURL: youtubeURL,
-            displayUUID: displayIdentity.uuid(key.displayID)
+            displayUUID: displayIdentity.uuid(key.displayID),
+            // A YouTube file is fetched again from its URL, so only other files
+            // need a bookmark. Apple: a bookmark "offers a more sure way of
+            // locating the file or directory later."
+            bookmark: youtubeURL == nil ? try? path.bookmarkData() : nil
         ).plistObject()
+    }
+
+    /// The record's file: its saved path, or where its bookmark now points when
+    /// the user has moved or renamed it.
+    private func resolvedFile(for record: WallpaperPersistedRecord) -> URL? {
+        if fileExists(record.path) { return URL(filePath: record.path) }
+        guard let bookmark = record.bookmark else { return nil }
+        var isStale = false
+        guard let url = try? URL(resolvingBookmarkData: bookmark, options: .withoutUI, bookmarkDataIsStale: &isStale),
+              fileExists(url.path(percentEncoded: false))
+        else { return nil }
+        return url
     }
 
     /// The record's key on this boot: its display UUID mapped to the display's
@@ -131,9 +154,9 @@ struct WallpaperPersistenceStore {
         guard saved < Self.currentSchemaVersion else { return }
 
         // Migrations run in order, from low version to high.
-        // v1 → v2: v1 records carry no `displayUUID`. They need no rewrite: `load`
-        // keys a record without one by its saved `displayID`, and the next save
-        // adds the UUID.
+        // v1 → v2: v1 records carry no `displayUUID` or `bookmark`. They need no
+        // rewrite: `load` keys a record without a UUID by its saved `displayID`
+        // and finds its file by path, and the next save adds both.
 
         userDefaults.set(Self.currentSchemaVersion, forKey: Defaults.schemaVersion)
     }
@@ -184,9 +207,9 @@ struct WallpaperPersistenceStore {
                 persisted.state.knownSpaces[key.displayID, default: []].insert(key.spaceID)
             }
 
-            if fileExists(parsed.path) {
+            if let file = resolvedFile(for: parsed) {
                 persisted.state.entries[key] = WallpaperEntry(
-                    localURL: URL(filePath: parsed.path),
+                    localURL: file,
                     youtubeOrigin: parsed.youtubeURL
                 )
             } else if let youtubeURL = parsed.youtubeURL {

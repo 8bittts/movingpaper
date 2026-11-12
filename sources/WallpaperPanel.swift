@@ -24,6 +24,9 @@ final class WallpaperPanel: NSPanel {
         self.isMovable = false
         self.ignoresMouseEvents = true
         self.isReleasedWhenClosed = false
+        // Apple documents NSPanel's default as true; the wallpaper must stay up
+        // when the app deactivates after an alert or the open panel.
+        self.hidesOnDeactivate = false
 
         self.collectionBehavior = [
             .canJoinAllSpaces,   // Visible on all Spaces/desktops

@@ -238,11 +238,14 @@ final class StatusBarController: NSObject {
 
     @objc private func about() {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        // HIG: About shows "copyright and version information".
+        let copyright = Bundle.main.object(forInfoDictionaryKey: "NSHumanReadableCopyright") as? String ?? ""
         AppPresentation.withForegroundActivation {
             let alert = NSAlert()
             alert.messageText = "MovingPaper"
             let versionLine = version.isEmpty ? "" : "Version \(version)\n\n"
-            alert.informativeText = "\(versionLine)A moving wallpaper for your desktop.\n\nBuilt with YEN — yen.chat"
+            let copyrightLine = copyright.isEmpty ? "" : "\n\n\(copyright)"
+            alert.informativeText = "\(versionLine)A moving wallpaper for your desktop.\n\nBuilt with YEN — yen.chat\(copyrightLine)"
             alert.alertStyle = .informational
             alert.addButton(withTitle: "OK")
             alert.addButton(withTitle: "Visit YEN")

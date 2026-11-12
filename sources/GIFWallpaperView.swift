@@ -49,8 +49,18 @@ final class GIFWallpaperView: NSView, WallpaperContentView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-        imageLayer?.contentsScale = scale
+        updateContentsScale()
+    }
+
+    /// A layer the view creates itself does not follow the backing scale, so
+    /// update it when the window moves to a display with a different scale.
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        updateContentsScale()
+    }
+
+    private func updateContentsScale() {
+        imageLayer?.contentsScale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
     }
 
     override func layout() {

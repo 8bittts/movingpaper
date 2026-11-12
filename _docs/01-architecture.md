@@ -37,6 +37,8 @@ A video that cannot be loaded or played, and a GIF ImageIO rejects, reach `Wallp
 
 A saved playback position belongs to the file that was playing: assigning a different file to a desktop drops it.
 Saved wallpapers carry the display UUID (schema v2) beside the display ID, because a display ID can change across a restart; loading maps the UUID back to the connected display's current ID.
+A user's own file also carries a bookmark, so a file moved or renamed since the last save is still found; YouTube files carry none, because they are fetched again from their URL.
+The YouTube cache is excluded from backup because every file in it can be downloaded again; the Photos caches stay backed up.
 Requests are keyed by desktop: in Per Desktop mode each Space of a display is its own target, so a request on one Space does not cancel another Space's download.
 Launch-time cache cleanup skips files modified after launch, which belong to work the session already started.
 
