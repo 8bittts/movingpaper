@@ -20,6 +20,8 @@ Status-menu structure lives in `MenuSnapshot`; tests cover labels without launch
 
 ## Constraints
 
+- Declare no SwiftPM target resources: `Bundle.module` resolves only the `.app` root and the build machine's `.build/` path, so v0.016 through v0.044 crashed at launch on every other Mac.
+  `sources/Resources/` is excluded in `Package.swift`, and `./scripts/smoke-test.sh` fails a binary that carries the accessor.
 - Keep the production bundle identifier `com.8bittts.movingpaper` and preserve `AppIdentityDefaultsMigration` when touching defaults or bundle metadata.
 - Do not reintroduce a visible Settings surface.
   `MovingPaperApp` keeps a hidden `Settings { EmptyView() }` scene for lifecycle only and replaces `.appSettings` with an empty command group so Cmd-, cannot open a blank window.

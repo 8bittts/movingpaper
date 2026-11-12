@@ -36,7 +36,6 @@ swift build
 
 BUILD_BIN_DIR="$(swift build --show-bin-path)"
 BUILD_BINARY="${BUILD_BIN_DIR}/${APP_NAME}"
-RESOURCE_BUNDLE="${BUILD_BIN_DIR}/${APP_NAME}_${APP_NAME}.bundle"
 
 [ -f "$BUILD_BINARY" ] || { echo "Missing app binary at ${BUILD_BINARY}" >&2; exit 1; }
 [ -f "$SOURCE_PLIST" ] || { echo "Missing source Info.plist at ${SOURCE_PLIST}" >&2; exit 1; }
@@ -49,10 +48,6 @@ mkdir -p "$APP_MACOS" "$APP_RESOURCES" "$APP_FRAMEWORKS"
 
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
-
-if [ -d "$RESOURCE_BUNDLE" ]; then
-    cp -R "$RESOURCE_BUNDLE" "$APP_RESOURCES/"
-fi
 
 ditto "$SPARKLE_SOURCE" "$APP_FRAMEWORKS/Sparkle.framework"
 cp "$SOURCE_PLIST" "$INFO_PLIST"

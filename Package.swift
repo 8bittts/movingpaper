@@ -36,9 +36,13 @@ let package = Package(
         .executableTarget(
             name: "MovingPaper",
             path: "sources",
-            resources: [
-                .copy("Resources"),
-            ],
+            // [CRITICAL] Declare no SwiftPM resources. A resource makes SwiftPM generate
+            // `Bundle.module`, whose accessor looks only at the `.app` root and at an absolute
+            // `.build/` path on the build machine, never at `Contents/Resources`. v0.016 through
+            // v0.044 read it at launch and crashed on every Mac without that build directory.
+            // `Resources/Info.plist` is copied into the bundle by the build scripts, and the icon
+            // comes from `Assets.car`. Excluding the folder keeps `Bundle.module` a compile error.
+            exclude: ["Resources"],
             swiftSettings: [
                 .unsafeFlags([
                     "-F",

@@ -5,6 +5,7 @@ Gates, test strategy, static analysis and verification rules for MovingPaper.
 ## Gates
 
 `swift test` runs the unit suite in `tests/`, and `./scripts/smoke-test.sh` is the pre-ship gate: it runs the tests, builds release, assembles a staged app bundle and verifies the bundle shape without launching the wallpaper.
+The bundle-shape check fails a binary that carries a SwiftPM `Bundle.module` accessor or a `.build/` path, or an app that ships a resource bundle; the release check also fails a home-directory path.
 `./scripts/smoke-test.sh --production` also requires and verifies the signed release app, the signed and notarized DMG, the checksum and the signed Sparkle appcast, and the release flow runs it as its production gate.
 CI only compiles the app and its tests; it cannot run them until a hosted runner runs macOS 27 ([05-infrastructure.md](05-infrastructure.md)).
 

@@ -216,7 +216,6 @@ step "Build complete"
 
 BIN_DIR="$(swift build -c release --show-bin-path)"
 BINARY_PATH="${BIN_DIR}/${APP_NAME}"
-RESOURCE_BUNDLE="${BIN_DIR}/${APP_NAME}_${APP_NAME}.bundle"
 
 [ -f "$BINARY_PATH" ] || fail "Binary not found at ${BINARY_PATH}"
 
@@ -234,10 +233,6 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$FRAMEWORKS_DIR"
 
 cp "$BINARY_PATH" "$MACOS_DIR/${APP_NAME}"
 step "Copied binary"
-
-[ -d "$RESOURCE_BUNDLE" ] || fail "Resource bundle not found at ${RESOURCE_BUNDLE}"
-cp -R "$RESOURCE_BUNDLE" "$RESOURCES_DIR/"
-step "Copied resource bundle"
 
 ditto "$SPARKLE_SOURCE" "$FRAMEWORKS_DIR/Sparkle.framework"
 step "Copied Sparkle.framework"

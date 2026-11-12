@@ -15,6 +15,7 @@ Dates are the evidence in this doc; the owner docs carry none.
 - 2026-11-10: the deployment target moves from macOS 15 to macOS 27; v0.044 is the last release for macOS 15 through 26.
 - 2026-11-10: the app icon becomes an Icon Composer document, closing HIG follow-up #45; the iconset pipeline and the run-time icon override are removed.
 - 2026-11-10: the menu-bar extra returns to the brand mark, now the system-rendered app icon in place of the template symbol the HIG pass introduced.
+- 2026-11-12: v0.042 crashed at launch on the build Mac, so no status item appeared. v0.016 through v0.044 read SwiftPM's `Bundle.module` at launch, and its accessor resolves only the `.app` root and an absolute `.build/` path, never `Contents/Resources`. Those releases ran only where that build directory existed and trap at launch everywhere else, before Sparkle starts, so they cannot update themselves. v0.045 no longer reads it; the target now declares no resources and the smoke test fails a binary that carries the accessor.
 
 ## Decisions
 
@@ -78,4 +79,4 @@ Decisions:
 - **Occlusion is notification-driven only.** A probe showed `occlusionState` reads as not visible right after `orderFront` even for a window that is about to appear, so sampling it there paused content the old views then started anyway.
 - **`activate()` replaces `activate(ignoringOtherApps:)`**, which Apple deprecated; its flag has had no effect since macOS 14.
 
-Left as they are, on purpose: the hidden `Settings` scene (`AGENTS.md`), the non-opaque black `WallpaperPanel` (unverifiable without a runtime check), the caches under Application Support, and `Info.plist` inside the SwiftPM resource directory (four scripts read that path).
+Left as they are, on purpose: the hidden `Settings` scene (`AGENTS.md`), the non-opaque black `WallpaperPanel` (unverifiable without a runtime check), the caches under Application Support, and `Info.plist` under `sources/Resources/` (four scripts read that path; the target excludes the folder rather than declaring it a SwiftPM resource).

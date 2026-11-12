@@ -74,6 +74,34 @@ verify_app_bundle_shape() {
     assert_plist_value "$plist" "LSMinimumSystemVersion" "$(plist_value sources/Resources/Info.plist LSMinimumSystemVersion)"
 
     otool -L "$binary" | grep -q "@rpath/Sparkle.framework" || fail "${binary} is not linked to bundled Sparkle via @rpath"
+    verify_no_build_machine_paths "$app" "$binary"
+}
+
+# SwiftPM's `Bundle.module` resolves only against the `.app` root and an absolute
+# `.build/` path on the build machine, so a binary that carries its accessor runs on
+# this Mac and traps at launch everywhere else (v0.016 through v0.044 did).
+verify_no_build_machine_paths() {
+    local app="$1"
+    local binary="$2"
+    local require_no_home_paths="${3:-false}"
+    local strings_out
+    strings_out="$(strings -a -n 6 "$binary")" || fail "strings could not read ${binary}"
+    [ -n "$strings_out" ] || fail "strings read nothing from ${binary}"
+    grep -q "NSApplication" <<< "$strings_out" || fail "strings output for ${binary} lacks a known symbol; the scan did not run"
+    if grep -Fq "could not load resource bundle" <<< "$strings_out"; then
+        fail "${binary} contains a SwiftPM Bundle.module accessor; declare no target resources"
+    fi
+    if grep -Fq "/.build/" <<< "$strings_out"; then
+        fail "${binary} embeds a build-directory path: $(grep -F "/.build/" <<< "$strings_out" | head -1)"
+    fi
+    # Debug builds keep `#filePath` source paths; a release binary must not name the build machine's home.
+    if [ "$require_no_home_paths" = true ] && grep -Eq '/Users/[^/]+/' <<< "$strings_out"; then
+        fail "${binary} embeds a home-directory path: $(grep -Eo '/Users/[^/]+/[^ ]*' <<< "$strings_out" | head -1)"
+    fi
+    if compgen -G "${app}/Contents/Resources/*.bundle" >/dev/null; then
+        fail "${app} ships a SwiftPM resource bundle; declare no target resources"
+    fi
+    step "${app} carries no build-machine paths or SwiftPM resource bundle"
 }
 
 verify_release_artifacts() {
@@ -86,6 +114,7 @@ verify_release_artifacts() {
     local appcast="build/appcast.xml"
 
     verify_app_bundle_shape "$app"
+    verify_no_build_machine_paths "$app" "${app}/Contents/MacOS/${APP_NAME}" true
     assert_plist_value "$plist" "CFBundleShortVersionString" "$version"
     assert_plist_value "$plist" "CFBundleVersion" "$build_number"
     require_file "$dmg"
